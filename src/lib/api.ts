@@ -14,9 +14,14 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Empty locally (vite's dev-server proxy forwards /api/* to :8002, see vite.config.ts) —
+// set to the deployed API's origin (e.g. https://console.nyayops.in) on Vercel, since the
+// frontend and backend are separate deployments there with no shared-origin proxy.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
