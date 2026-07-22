@@ -2,8 +2,8 @@ import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { benchDisplay, KNOWN_BENCHES } from "@/lib/benches";
+import { DatePicker } from "@/components/DatePicker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PaginationBar } from "@/components/ui/pagination";
 import {
   Select,
@@ -102,11 +102,13 @@ export function CauseListReviewPage() {
         and correct individual entries against the source PDF.
       </p>
 
-      <div className="mb-4 flex flex-wrap items-end gap-2">
-        <div>
+      <div className="mb-4 flex flex-wrap items-end gap-x-4 gap-y-3">
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Bench</label>
           <Select value={benchKey || "all"} onValueChange={(v) => { setBenchKey(v === "all" ? "" : v); resetAndFetch(); }}>
-            <SelectTrigger size="sm" className="w-56"><SelectValue placeholder="All benches" /></SelectTrigger>
+            <SelectTrigger size="sm" className="w-48">
+              <span className="truncate">{benchKey ? benchDisplay(benchKey).label : "All benches"}</span>
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All benches</SelectItem>
               {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
@@ -117,10 +119,10 @@ export function CauseListReviewPage() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">List type</label>
           <Select value={listType || "all"} onValueChange={(v) => { setListType(v === "all" ? "" : v); resetAndFetch(); }}>
-            <SelectTrigger size="sm" className="w-48"><SelectValue placeholder="All list types" /></SelectTrigger>
+            <SelectTrigger size="sm" className="w-40"><SelectValue placeholder="All list types" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All list types</SelectItem>
               {LIST_TYPES.map((t) => (
@@ -129,20 +131,15 @@ export function CauseListReviewPage() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Cause list date</label>
-          <Input
-            type="date"
-            value={causeListDate}
-            onChange={(e) => { setCauseListDate(e.target.value); resetAndFetch(); }}
-            className="w-40"
-          />
+          <DatePicker value={causeListDate} onChange={(v) => { setCauseListDate(v); resetAndFetch(); }} />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Sort by</label>
           <div className="flex gap-1">
             <Select value={sortBy} onValueChange={(v) => { setSortBy(v); resetAndFetch(); }}>
-              <SelectTrigger size="sm" className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SORT_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -167,6 +164,10 @@ export function CauseListReviewPage() {
           Group by reason
         </Button>
       </div>
+
+      {list.error && (
+        <p className="mb-4 text-sm text-destructive">{list.error.message}</p>
+      )}
 
       <div className="rounded-lg border bg-card">
         <Table>

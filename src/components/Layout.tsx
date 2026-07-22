@@ -1,6 +1,7 @@
 import {
   Activity,
   Building2,
+  ChevronsUpDown,
   ClipboardList,
   Gavel,
   History,
@@ -12,13 +13,19 @@ import {
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -60,6 +67,7 @@ export function Layout() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
+            <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {NAV.map((item) => (
@@ -81,21 +89,29 @@ export function Layout() {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <div className="flex items-center justify-between px-2 py-1 group-data-[collapsible=icon]:hidden">
-            <div className="text-sm">
-              <div className="font-medium">{operator?.display_name}</div>
-              <div className="text-xs text-muted-foreground">@{operator?.username}</div>
-            </div>
-            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </Button>
-          </div>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={logout} tooltip="Sign out">
-                <LogOut />
-                <span>Sign out</span>
-              </SidebarMenuButton>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton size="lg">
+                    <div className="flex flex-col text-left leading-tight">
+                      <span className="truncate text-sm font-medium">{operator?.display_name}</span>
+                      <span className="truncate text-xs text-muted-foreground">@{operator?.username}</span>
+                    </div>
+                    <ChevronsUpDown className="ml-auto size-4" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-(--radix-dropdown-menu-trigger-width)">
+                  <DropdownMenuItem onClick={toggleTheme}>
+                    {theme === "dark" ? <Sun /> : <Moon />}
+                    {theme === "dark" ? "Light mode" : "Dark mode"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={logout}>
+                    <LogOut />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

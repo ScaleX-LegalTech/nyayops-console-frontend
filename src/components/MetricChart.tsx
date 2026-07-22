@@ -95,7 +95,7 @@ export function MetricChart({ title, service, series, window, tall }: MetricChar
           {query.isLoading ? "Loading..." : "No data yet"}
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height="90%">
+        <ResponsiveContainer width="100%" height="90%" debounce={200}>
           <LineChart data={chartData} margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis dataKey="time" tick={{ fontSize: 11 }} tickLine={false} className="fill-muted-foreground" />

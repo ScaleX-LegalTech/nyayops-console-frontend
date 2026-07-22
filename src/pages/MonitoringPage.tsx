@@ -37,8 +37,12 @@ export function MonitoringPage() {
         </div>
       </div>
 
-      {Object.entries(SERIES).map(([service, seriesList]) => (
-        <ServiceSection key={service} service={service}>
+      {Object.entries(SERIES).map(([service, seriesList], i) => (
+        // Only the first section's charts mount by default - keeps the initial load to
+        // one service's worth of simultaneous chart queries instead of firing all 9 at
+        // once (confirmed live: 9 concurrent /metrics/query calls on mount was a real
+        // source of the reported lag).
+        <ServiceSection key={service} service={service} defaultOpen={i === 0}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {seriesList.map((s) => (
               <MetricChart key={s.key} title={s.label} service={service} series={s.key} window={window} />

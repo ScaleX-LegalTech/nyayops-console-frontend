@@ -1,7 +1,7 @@
 import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
 import { useState } from "react";
+import { DatePicker } from "@/components/DatePicker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PaginationBar } from "@/components/ui/pagination";
 import {
   Select,
@@ -49,11 +49,13 @@ export function FetchHistoryPage() {
         no admin route before.
       </p>
 
-      <div className="mb-4 flex flex-wrap items-end gap-2">
-        <div>
+      <div className="mb-4 flex flex-wrap items-end gap-x-4 gap-y-3">
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Bench</label>
           <Select value={benchKey || "all"} onValueChange={(v) => { setBenchKey(v === "all" ? "" : v); list.reset(); }}>
-            <SelectTrigger size="sm" className="w-56"><SelectValue placeholder="All benches" /></SelectTrigger>
+            <SelectTrigger size="sm" className="w-48">
+              <span className="truncate">{benchKey ? benchDisplay(benchKey).label : "All benches"}</span>
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All benches</SelectItem>
               {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
@@ -64,20 +66,15 @@ export function FetchHistoryPage() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Cause list date</label>
-          <Input
-            type="date"
-            value={causeListDate}
-            onChange={(e) => { setCauseListDate(e.target.value); list.reset(); }}
-            className="w-40"
-          />
+          <DatePicker value={causeListDate} onChange={(v) => { setCauseListDate(v); list.reset(); }} />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Sort by</label>
           <div className="flex gap-1">
             <Select value={sortBy} onValueChange={(v) => { setSortBy(v); list.reset(); }}>
-              <SelectTrigger size="sm" className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SORT_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -95,6 +92,10 @@ export function FetchHistoryPage() {
           </div>
         </div>
       </div>
+
+      {list.error && (
+        <p className="mb-4 text-sm text-destructive">{list.error.message}</p>
+      )}
 
       <div className="rounded-lg border bg-card">
         <Table>

@@ -146,8 +146,10 @@ export function HealthPage() {
       <h1 className="mb-6 text-xl font-semibold">Health</h1>
       <div className="space-y-6">
         {health.data &&
-          Object.entries(health.data).map(([service, h]) => (
-            <ServiceSection key={service} service={service} status={h.status}>
+          Object.entries(health.data).map(([service, h], i) => (
+            // Only first section open by default - same lag fix as MonitoringPage
+            // (JobsTable's own paginated query only fires once CDE section is open too).
+            <ServiceSection key={service} service={service} status={h.status} defaultOpen={i === 0}>
               <ServiceCard health={h} />
               {service === "cde" && <JobsTable />}
             </ServiceSection>
