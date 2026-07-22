@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { Fragment, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,18 @@ import { Input } from "@/components/ui/input";
 import { PaginationBar } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, type BenchConfig } from "@/lib/api";
+import { benchDisplay } from "@/lib/benches";
 import { usePaginatedList } from "@/lib/pagination";
+
+function groupByCourt(items: BenchConfig[]) {
+  const groups = new Map<string, BenchConfig[]>();
+  for (const c of items) {
+    const group = benchDisplay(c.bench_key).courtGroup;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group)!.push(c);
+  }
+  return groups;
+}
 
 const emptyForm = {
   court_type: "",
@@ -26,6 +37,7 @@ export function BenchConfigsPage() {
   );
   const [form, setForm] = useState(emptyForm);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const grouped = useMemo(() => groupByCourt(list.items), [list.items]);
 
   async function toggle(c: BenchConfig, field: "enabled" | "fetch_civil" | "fetch_criminal") {
     const key = `${c.court_type}:${c.bench_key}`;
@@ -132,33 +144,43 @@ export function BenchConfigsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {list.items.map((c) => {
-              const key = `${c.court_type}:${c.bench_key}`;
-              const busy = busyKey === key;
-              return (
-                <TableRow key={key}>
-                  <TableCell>{c.bench_key}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.court_type}</TableCell>
-                  <TableCell>
-                    <Checkbox checked={c.enabled} disabled={busy} onCheckedChange={() => toggle(c, "enabled")} />
-                  </TableCell>
-                  <TableCell>
-                    <Checkbox
-                      checked={c.fetch_civil}
-                      disabled={busy}
-                      onCheckedChange={() => toggle(c, "fetch_civil")}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Checkbox
-                      checked={c.fetch_criminal}
-                      disabled={busy}
-                      onCheckedChange={() => toggle(c, "fetch_criminal")}
-                    />
+            {Array.from(grouped.entries()).map(([courtGroup, configs]) => (
+              <Fragment key={courtGroup}>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableCell colSpan={5} className="py-1.5 text-xs font-semibold text-muted-foreground">
+                    {courtGroup}
                   </TableCell>
                 </TableRow>
-              );
-            })}
+                {configs.map((c) => {
+                  const key = `${c.court_type}:${c.bench_key}`;
+                  const busy = busyKey === key;
+                  const bench = benchDisplay(c.bench_key);
+                  return (
+                    <TableRow key={key}>
+                      <TableCell>{bench.label}</TableCell>
+                      <TableCell className="text-muted-foreground">{c.court_type}</TableCell>
+                      <TableCell>
+                        <Checkbox checked={c.enabled} disabled={busy} onCheckedChange={() => toggle(c, "enabled")} />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox
+                          checked={c.fetch_civil}
+                          disabled={busy}
+                          onCheckedChange={() => toggle(c, "fetch_civil")}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox
+                          checked={c.fetch_criminal}
+                          disabled={busy}
+                          onCheckedChange={() => toggle(c, "fetch_criminal")}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </Fragment>
+            ))}
           </TableBody>
         </Table>
         <PaginationBar

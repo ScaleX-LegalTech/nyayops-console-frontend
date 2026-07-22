@@ -90,8 +90,16 @@ export const api = {
   resetUserPassword: (tenantId: string, userId: string) =>
     request(`/tenants/${tenantId}/users/${userId}/reset-password`, { method: "POST" }),
 
-  listLowConfidence: (limit: number, offset: number) =>
-    request<Page<CauseListDocument>>(`/cause-lists/low-confidence?${qs({ limit, offset })}`),
+  listLowConfidence: (params: {
+    court_type?: string;
+    bench_key?: string;
+    list_type?: string;
+    cause_list_date?: string;
+    sort_by?: string;
+    sort_dir?: string;
+    limit: number;
+    offset: number;
+  }) => request<Page<CauseListDocument>>(`/cause-lists/low-confidence?${qs(params)}`),
   getDocument: (id: string) =>
     request<{ document: CauseListDocument; entries: CauseListEntry[] }>(
       `/cause-lists/documents/${id}`,
@@ -105,6 +113,9 @@ export const api = {
   listFetchAttempts: (params: {
     court_type?: string;
     source_bench_key?: string;
+    cause_list_date?: string;
+    sort_by?: string;
+    sort_dir?: string;
     limit: number;
     offset: number;
   }) => request<Page<FetchAttempt>>(`/cause-lists/fetch-attempts?${qs(params)}`),

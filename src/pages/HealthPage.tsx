@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { ServiceSection } from "@/components/ServiceSection";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaginationBar } from "@/components/ui/pagination";
@@ -12,18 +13,16 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { humanizeSnake } from "@/lib/format";
 import { usePaginatedList } from "@/lib/pagination";
 
 type ServiceHealth = { status: string; [k: string]: unknown };
 
 function humanLabel(key: string): string {
-  return key
-    .replace(/_ok$|_alive$/, "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return humanizeSnake(key.replace(/_ok$|_alive$/, ""));
 }
 
-function ServiceCard({ name, health }: { name: string; health: ServiceHealth }) {
+function ServiceCard({ health }: { health: ServiceHealth }) {
   const boolEntries = Object.entries(health).filter(
     ([k, v]) => (k.endsWith("_ok") || k.endsWith("_alive")) && typeof v === "boolean",
   );
@@ -33,12 +32,11 @@ function ServiceCard({ name, health }: { name: string; health: ServiceHealth }) 
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base capitalize">{name}</CardTitle>
-        <Badge variant={health.status === "ok" ? "success" : "destructive"}>{health.status}</Badge>
+      <CardHeader>
+        <CardTitle className="text-sm text-muted-foreground">Dependencies</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
           {boolEntries.map(([key, value]) => (
             <div key={key} className="flex items-center justify-between rounded-md border px-2 py-1 text-sm">
               <span className="text-muted-foreground">{humanLabel(key)}</span>
@@ -66,6 +64,76 @@ function ServiceCard({ name, health }: { name: string; health: ServiceHealth }) 
   );
 }
 
+function JobsTable() {
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [adapterFilter, setAdapterFilter] = useState<string>("");
+  const jobs = usePaginatedList(
+    ["jobs", statusFilter, adapterFilter],
+    (limit, offset) =>
+      api.listJobs({ status: statusFilter || undefined, adapter: adapterFilter || undefined, limit, offset }),
+    25,
+  );
+
+  return (
+    <div className="mt-4">
+      <h3 className="mb-3 text-sm font-medium text-muted-foreground">Recent jobs</h3>
+      <div className="mb-3 flex gap-2">
+        <Select value={statusFilter || "all"} onValueChange={(v) => { setStatusFilter(v === "all" ? "" : v); jobs.reset(); }}>
+          <SelectTrigger size="sm" className="w-40"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="queued">Queued</SelectItem>
+            <SelectItem value="running">Running</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="failed">Failed</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={adapterFilter || "all"} onValueChange={(v) => { setAdapterFilter(v === "all" ? "" : v); jobs.reset(); }}>
+          <SelectTrigger size="sm" className="w-40"><SelectValue placeholder="All adapters" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All adapters</SelectItem>
+            <SelectItem value="order_download">Order download</SelectItem>
+            <SelectItem value="case_sync">Case sync</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Status</TableHead>
+              <TableHead>Adapter</TableHead>
+              <TableHead>Attempts</TableHead>
+              <TableHead>Error</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Completed</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {jobs.items.map((j) => (
+              <TableRow key={j.id}>
+                <TableCell>
+                  <Badge variant={j.status === "failed" ? "destructive" : j.status === "completed" ? "success" : "secondary"}>
+                    {j.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>{humanizeSnake(j.adapter)}</TableCell>
+                <TableCell>{j.attempts}</TableCell>
+                <TableCell className="max-w-64 truncate text-muted-foreground">{j.last_error ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{new Date(j.created_at).toLocaleString()}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {j.completed_at ? new Date(j.completed_at).toLocaleString() : "—"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <PaginationBar offset={jobs.offset} count={jobs.items.length} hasMore={jobs.hasMore} onPrev={jobs.prev} onNext={jobs.next} />
+      </div>
+    </div>
+  );
+}
+
 export function HealthPage() {
   const health = useQuery({
     queryKey: ["health"],
@@ -73,87 +141,17 @@ export function HealthPage() {
     refetchInterval: 15_000,
   });
 
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [adapterFilter, setAdapterFilter] = useState<string>("");
-  const jobs = usePaginatedList(
-    ["jobs", statusFilter, adapterFilter],
-    (limit, offset) => api.listJobs({ status: statusFilter || undefined, adapter: adapterFilter || undefined, limit, offset }),
-    25,
-  );
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="mb-6 text-xl font-semibold">Health</h1>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {health.data &&
-            Object.entries(health.data).map(([service, h]) => (
-              <ServiceCard key={service} name={service} health={h} />
-            ))}
-        </div>
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">CDE recent jobs</h2>
-        <div className="mb-3 flex gap-2">
-          <Select value={statusFilter || "all"} onValueChange={(v) => { setStatusFilter(v === "all" ? "" : v); jobs.reset(); }}>
-            <SelectTrigger size="sm" className="w-40"><SelectValue placeholder="All statuses" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="queued">queued</SelectItem>
-              <SelectItem value="running">running</SelectItem>
-              <SelectItem value="completed">completed</SelectItem>
-              <SelectItem value="failed">failed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={adapterFilter || "all"} onValueChange={(v) => { setAdapterFilter(v === "all" ? "" : v); jobs.reset(); }}>
-            <SelectTrigger size="sm" className="w-40"><SelectValue placeholder="All adapters" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All adapters</SelectItem>
-              <SelectItem value="order_download">order_download</SelectItem>
-              <SelectItem value="case_sync">case_sync</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="rounded-lg border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Status</TableHead>
-                <TableHead>Adapter</TableHead>
-                <TableHead>Attempts</TableHead>
-                <TableHead>Error</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Completed</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {jobs.items.map((j) => (
-                <TableRow key={j.id}>
-                  <TableCell>
-                    <Badge variant={j.status === "failed" ? "destructive" : j.status === "completed" ? "success" : "secondary"}>
-                      {j.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{j.adapter}</TableCell>
-                  <TableCell>{j.attempts}</TableCell>
-                  <TableCell className="max-w-64 truncate text-muted-foreground">{j.last_error ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(j.created_at).toLocaleString()}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {j.completed_at ? new Date(j.completed_at).toLocaleString() : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <PaginationBar
-            offset={jobs.offset}
-            count={jobs.items.length}
-            hasMore={jobs.hasMore}
-            onPrev={jobs.prev}
-            onNext={jobs.next}
-          />
-        </div>
+    <div>
+      <h1 className="mb-6 text-xl font-semibold">Health</h1>
+      <div className="space-y-6">
+        {health.data &&
+          Object.entries(health.data).map(([service, h]) => (
+            <ServiceSection key={service} service={service} status={h.status}>
+              <ServiceCard health={h} />
+              {service === "cde" && <JobsTable />}
+            </ServiceSection>
+          ))}
       </div>
     </div>
   );

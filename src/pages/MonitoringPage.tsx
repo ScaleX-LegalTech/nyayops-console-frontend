@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MetricChart } from "@/components/MetricChart";
+import { ServiceSection } from "@/components/ServiceSection";
 import { Button } from "@/components/ui/button";
 
 const SERIES: Record<string, { key: string; label: string }[]> = {
@@ -24,7 +25,7 @@ export function MonitoringPage() {
   const [window, setWindow] = useState<(typeof WINDOWS)[number]>("6h");
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Monitoring</h1>
         <div className="flex gap-1">
@@ -37,14 +38,13 @@ export function MonitoringPage() {
       </div>
 
       {Object.entries(SERIES).map(([service, seriesList]) => (
-        <section key={service}>
-          <h2 className="mb-3 text-sm font-medium capitalize text-muted-foreground">{service}</h2>
+        <ServiceSection key={service} service={service}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {seriesList.map((s) => (
               <MetricChart key={s.key} title={s.label} service={service} series={s.key} window={window} />
             ))}
           </div>
-        </section>
+        </ServiceSection>
       ))}
     </div>
   );

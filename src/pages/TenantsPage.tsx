@@ -70,11 +70,7 @@ export function TenantsPage() {
           <TableBody>
             {visible.map((t) => (
               <TableRow key={t.id}>
-                <TableCell>
-                  <Link className="text-primary hover:underline" to={`/tenants/${t.id}/users`}>
-                    {t.name}
-                  </Link>
-                </TableCell>
+                <TableCell className="font-medium">{t.name}</TableCell>
                 <TableCell className="text-muted-foreground">{t.slug}</TableCell>
                 <TableCell>
                   <button
@@ -106,6 +102,9 @@ export function TenantsPage() {
                   <StatusBadge tenant={t} />
                 </TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap">
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link to={`/tenants/${t.id}/users`}>Manage users</Link>
+                  </Button>
                   {!t.deleted_at && (
                     <Button
                       size="sm"
