@@ -1,125 +1,133 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { api, type TenantUser } from "@/lib/api";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PaginationBar } from "@/components/ui/pagination";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { api } from "@/lib/api";
+import { usePaginatedList } from "@/lib/pagination";
 
 export function TenantUsersPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
-  const [users, setUsers] = useState<TenantUser[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
 
-  async function refresh() {
-    if (!tenantId) return;
-    try {
-      const { users } = await api.listTenantUsers(tenantId);
-      setUsers(users);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load users");
-    }
-  }
+  const list = usePaginatedList(
+    ["tenant-users", tenantId],
+    (limit, offset) => api.listTenantUsers(tenantId!, limit, offset),
+    25,
+  );
 
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
-
-  async function act(action: () => Promise<unknown>) {
-    setError(null);
+  async function act(action: () => Promise<unknown>, successMessage: string) {
     try {
       await action();
-      await refresh();
+      toast.success(successMessage);
+      await list.refetch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      toast.error(err instanceof Error ? err.message : "Action failed");
     }
   }
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-6">Tenant Users</h1>
-      {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
+      <h1 className="mb-6 text-xl font-semibold">Tenant Users</h1>
 
       <form
-        className="flex gap-2 mb-6"
+        className="mb-6 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           if (!tenantId) return;
-          act(() => api.inviteUser(tenantId, inviteEmail, inviteName)).then(() => {
+          act(() => api.inviteUser(tenantId, inviteEmail, inviteName), "Invited").then(() => {
             setInviteEmail("");
             setInviteName("");
           });
         }}
       >
-        <input
-          placeholder="Email"
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-          value={inviteEmail}
-          onChange={(e) => setInviteEmail(e.target.value)}
-        />
-        <input
-          placeholder="Full name"
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-          value={inviteName}
-          onChange={(e) => setInviteName(e.target.value)}
-        />
-        <button className="rounded bg-slate-900 text-white px-3 py-2 text-sm">Invite</button>
+        <Input placeholder="Email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="w-56" />
+        <Input placeholder="Full name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="w-56" />
+        <Button type="submit">Invite</Button>
       </form>
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="p-3">Name</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Role</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-t border-slate-100">
-                <td className="p-3">{u.full_name}</td>
-                <td className="p-3 text-slate-500">{u.email}</td>
-                <td className="p-3">
-                  {u.is_org_admin ? "Org Admin" : u.is_branch_admin ? "Branch Admin" : "Member"}
-                </td>
-                <td className="p-3">
-                  {u.is_active ? (
-                    <span className="text-green-600">active</span>
-                  ) : (
-                    <span className="text-slate-400">inactive</span>
-                  )}
-                </td>
-                <td className="p-3 space-x-2 whitespace-nowrap">
-                  <button
-                    className="text-xs underline"
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.items.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell>{u.full_name}</TableCell>
+                <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                <TableCell>{u.is_org_admin ? "Org Admin" : u.is_branch_admin ? "Branch Admin" : "Member"}</TableCell>
+                <TableCell className="space-x-1">
+                  {!u.is_active && <Badge variant="secondary">inactive</Badge>}
+                  {u.is_restricted && <Badge variant="warning">read-only</Badge>}
+                  {u.is_active && !u.is_restricted && <Badge variant="success">active</Badge>}
+                </TableCell>
+                <TableCell className="space-x-2 whitespace-nowrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() =>
-                      tenantId && act(() => api.updateUser(tenantId, u.id, { is_active: !u.is_active }))
+                      tenantId &&
+                      act(
+                        () => api.updateUser(tenantId, u.id, { is_active: !u.is_active }),
+                        u.is_active ? "Deactivated" : "Activated",
+                      )
                     }
                   >
                     {u.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button
-                    className="text-xs underline"
-                    onClick={() => tenantId && act(() => api.resetUserPassword(tenantId, u.id))}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      tenantId &&
+                      act(
+                        () => api.updateUser(tenantId, u.id, { is_restricted: !u.is_restricted }),
+                        u.is_restricted ? "Unfrozen" : "Frozen (read-only)",
+                      )
+                    }
+                  >
+                    {u.is_restricted ? "Unfreeze" : "Freeze"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => tenantId && act(() => api.resetUserPassword(tenantId, u.id), "Password reset")}
                   >
                     Reset password
-                  </button>
-                  <button
-                    className="text-xs underline text-red-600"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
                     onClick={() => {
                       if (tenantId && window.confirm(`Delete ${u.email}?`))
-                        act(() => api.deleteUser(tenantId, u.id));
+                        act(() => api.deleteUser(tenantId, u.id), "Deleted");
                     }}
                   >
                     Delete
-                  </button>
-                </td>
-              </tr>
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+        <PaginationBar
+          offset={list.offset}
+          count={list.items.length}
+          hasMore={list.hasMore}
+          onPrev={list.prev}
+          onNext={list.next}
+        />
       </div>
     </div>
   );

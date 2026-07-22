@@ -1,77 +1,51 @@
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useState } from "react";
+import { MetricChart } from "@/components/MetricChart";
+import { Button } from "@/components/ui/button";
 
-const SERVICES = ["backend", "cde"];
-const WINDOWS = ["1h", "6h", "24h", "7d"];
+const SERIES: Record<string, { key: string; label: string }[]> = {
+  backend: [
+    { key: "http_latency_p95", label: "API HTTP latency p95, by path" },
+    { key: "db_query_latency_p95", label: "DB query latency p95" },
+    { key: "celery_task_duration_p95", label: "Celery task duration p95, by task" },
+    { key: "celery_failure_rate", label: "Celery task failure rate, by task" },
+  ],
+  cde: [
+    { key: "job_age_p95", label: "Job age p95 (queue wait + fetch), by adapter" },
+    { key: "adapter_fetch_latency_p95", label: "Adapter fetch latency p95 (portal round-trip)" },
+    { key: "http_latency_p95", label: "API HTTP latency p95, by path" },
+    { key: "parser_success_rate", label: "Parser success rate, by adapter" },
+    { key: "captcha_success_rate", label: "Captcha success rate, by adapter" },
+  ],
+};
+
+const WINDOWS = ["1h", "6h", "24h", "7d"] as const;
 
 export function MonitoringPage() {
-  const [service, setService] = useState("backend");
-  const [series, setSeries] = useState<string[]>([]);
-  const [selectedSeries, setSelectedSeries] = useState("");
-  const [window, setWindowValue] = useState("1h");
-  const [data, setData] = useState<unknown>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .metricsSeries(service)
-      .then((res) => {
-        setSeries(res.series);
-        setSelectedSeries(res.series[0] ?? "");
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load series"));
-  }, [service]);
-
-  useEffect(() => {
-    if (!selectedSeries) return;
-    api
-      .metricsQuery(service, selectedSeries, window)
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to query metrics"));
-  }, [service, selectedSeries, window]);
+  const [window, setWindow] = useState<(typeof WINDOWS)[number]>("6h");
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold mb-6">Monitoring</h1>
-      <div className="flex gap-4 mb-6">
-        <select
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-          value={service}
-          onChange={(e) => setService(e.target.value)}
-        >
-          {SERVICES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-          value={selectedSeries}
-          onChange={(e) => setSelectedSeries(e.target.value)}
-        >
-          {series.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-          value={window}
-          onChange={(e) => setWindowValue(e.target.value)}
-        >
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Monitoring</h1>
+        <div className="flex gap-1">
           {WINDOWS.map((w) => (
-            <option key={w} value={w}>
+            <Button key={w} size="sm" variant={w === window ? "default" : "outline"} onClick={() => setWindow(w)}>
               {w}
-            </option>
+            </Button>
           ))}
-        </select>
+        </div>
       </div>
-      {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
-      <pre className="text-xs bg-white border border-slate-200 rounded-lg p-4 overflow-auto max-h-[70vh]">
-        {JSON.stringify(data, null, 2)}
-      </pre>
+
+      {Object.entries(SERIES).map(([service, seriesList]) => (
+        <section key={service}>
+          <h2 className="mb-3 text-sm font-medium capitalize text-muted-foreground">{service}</h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {seriesList.map((s) => (
+              <MetricChart key={s.key} title={s.label} service={service} series={s.key} window={window} />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

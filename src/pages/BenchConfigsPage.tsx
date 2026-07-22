@@ -1,90 +1,173 @@
-import { useEffect, useState } from "react";
+import { useState, type FormEvent } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { PaginationBar } from "@/components/ui/pagination";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, type BenchConfig } from "@/lib/api";
+import { usePaginatedList } from "@/lib/pagination";
+
+const emptyForm = {
+  court_type: "",
+  bench_key: "",
+  court_name_code: "",
+  enabled: true,
+  fetch_civil: true,
+  fetch_criminal: true,
+};
 
 export function BenchConfigsPage() {
-  const [configs, setConfigs] = useState<BenchConfig[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const list = usePaginatedList(
+    ["bench-configs"],
+    (limit, offset) => api.listBenchConfigs(undefined, limit, offset),
+    100,
+  );
+  const [form, setForm] = useState(emptyForm);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-
-  async function refresh() {
-    try {
-      const { configs } = await api.listBenchConfigs();
-      setConfigs(configs);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load bench configs");
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, []);
 
   async function toggle(c: BenchConfig, field: "enabled" | "fetch_civil" | "fetch_criminal") {
     const key = `${c.court_type}:${c.bench_key}`;
     setBusyKey(key);
-    setError(null);
     try {
       await api.upsertBenchConfig({ ...c, [field]: !c[field] });
-      await refresh();
+      await list.refetch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      toast.error(err instanceof Error ? err.message : "Update failed");
     } finally {
       setBusyKey(null);
     }
   }
 
+  async function submitNew(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await api.upsertBenchConfig({
+        ...form,
+        court_name_code: form.court_name_code || null,
+      });
+      toast.success("Bench config saved");
+      setForm(emptyForm);
+      await list.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    }
+  }
+
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-6">Bench Configs</h1>
-      {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="p-3">Bench</th>
-              <th className="p-3">Court</th>
-              <th className="p-3">Enabled</th>
-              <th className="p-3">Civil</th>
-              <th className="p-3">Criminal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {configs.map((c) => {
+      <h1 className="mb-6 text-xl font-semibold">Bench Configs</h1>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Add / update a config</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-wrap items-end gap-3" onSubmit={submitNew}>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Court type</label>
+              <Input
+                required
+                value={form.court_type}
+                onChange={(e) => setForm({ ...form, court_type: e.target.value })}
+                placeholder="high_court"
+                className="w-36"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Bench key</label>
+              <Input
+                required
+                value={form.bench_key}
+                onChange={(e) => setForm({ ...form, bench_key: e.target.value })}
+                placeholder="bombay_mumbai"
+                className="w-40"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Court name code</label>
+              <Input
+                value={form.court_name_code}
+                onChange={(e) => setForm({ ...form, court_name_code: e.target.value })}
+                placeholder="(district only)"
+                className="w-40"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={form.enabled}
+                onCheckedChange={(v) => setForm({ ...form, enabled: !!v })}
+              />
+              Enabled
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={form.fetch_civil}
+                onCheckedChange={(v) => setForm({ ...form, fetch_civil: !!v })}
+              />
+              Civil
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={form.fetch_criminal}
+                onCheckedChange={(v) => setForm({ ...form, fetch_criminal: !!v })}
+              />
+              Criminal
+            </label>
+            <Button type="submit">Save</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Bench</TableHead>
+              <TableHead>Court</TableHead>
+              <TableHead>Enabled</TableHead>
+              <TableHead>Civil</TableHead>
+              <TableHead>Criminal</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.items.map((c) => {
               const key = `${c.court_type}:${c.bench_key}`;
               const busy = busyKey === key;
               return (
-                <tr key={key} className="border-t border-slate-100">
-                  <td className="p-3">{c.bench_key}</td>
-                  <td className="p-3 text-slate-500">{c.court_type}</td>
-                  <td className="p-3">
-                    <input
-                      type="checkbox"
-                      checked={c.enabled}
-                      disabled={busy}
-                      onChange={() => toggle(c, "enabled")}
-                    />
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="checkbox"
+                <TableRow key={key}>
+                  <TableCell>{c.bench_key}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.court_type}</TableCell>
+                  <TableCell>
+                    <Checkbox checked={c.enabled} disabled={busy} onCheckedChange={() => toggle(c, "enabled")} />
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox
                       checked={c.fetch_civil}
                       disabled={busy}
-                      onChange={() => toggle(c, "fetch_civil")}
+                      onCheckedChange={() => toggle(c, "fetch_civil")}
                     />
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="checkbox"
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox
                       checked={c.fetch_criminal}
                       disabled={busy}
-                      onChange={() => toggle(c, "fetch_criminal")}
+                      onCheckedChange={() => toggle(c, "fetch_criminal")}
                     />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+        <PaginationBar
+          offset={list.offset}
+          count={list.items.length}
+          hasMore={list.hasMore}
+          onPrev={list.prev}
+          onNext={list.next}
+        />
       </div>
     </div>
   );

@@ -1,72 +1,64 @@
-import { useEffect, useState } from "react";
-import { api, type CauseListDocument } from "@/lib/api";
+import { Link } from "react-router-dom";
+import { PaginationBar } from "@/components/ui/pagination";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { api } from "@/lib/api";
+import { usePaginatedList } from "@/lib/pagination";
 
 export function CauseListReviewPage() {
-  const [documents, setDocuments] = useState<CauseListDocument[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  async function refresh() {
-    try {
-      const { documents } = await api.listLowConfidence();
-      setDocuments(documents);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load documents");
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  async function download(id: string) {
-    try {
-      const { download_url } = await api.downloadDocument(id);
-      window.open(download_url, "_blank");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get download URL");
-    }
-  }
+  const list = usePaginatedList(
+    ["low-confidence"],
+    (limit, offset) => api.listLowConfidence(limit, offset),
+    25,
+  );
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-2">Cause-List Review (HITL)</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Documents tier-1 flagged low-confidence, tier-2 hasn't corroborated.
+      <h1 className="mb-2 text-xl font-semibold">Cause-List Review (HITL)</h1>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Documents tier-1 flagged low-confidence, tier-2 hasn't corroborated. Click a row to review
+        and correct individual entries against the source PDF.
       </p>
-      {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="p-3">Bench</th>
-              <th className="p-3">Date</th>
-              <th className="p-3">List Type</th>
-              <th className="p-3">Judge(s)</th>
-              <th className="p-3">Reasons</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((d) => (
-              <tr key={d.id} className="border-t border-slate-100">
-                <td className="p-3">
-                  {d.court_type} / {d.source_bench_key}
-                </td>
-                <td className="p-3">{d.cause_list_date}</td>
-                <td className="p-3">{d.list_type}</td>
-                <td className="p-3 text-slate-500">{d.judge_names}</td>
-                <td className="p-3 text-xs text-slate-500">
-                  {(d.parse_confidence_reasons ?? []).join(", ")}
-                </td>
-                <td className="p-3">
-                  <button className="text-xs underline" onClick={() => download(d.id)}>
-                    Download PDF
-                  </button>
-                </td>
-              </tr>
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Bench</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>List Type</TableHead>
+              <TableHead>Judge(s)</TableHead>
+              <TableHead>Items</TableHead>
+              <TableHead>Reasons</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.items.map((d) => (
+              <TableRow key={d.id} className="cursor-pointer">
+                <TableCell colSpan={6} className="p-0">
+                  <Link
+                    to={`/cause-lists/review/${d.id}`}
+                    className="grid grid-cols-6 gap-2 px-2 py-2 hover:bg-accent"
+                  >
+                    <span>{d.court_type} / {d.source_bench_key}</span>
+                    <span>{d.cause_list_date}</span>
+                    <span>{d.list_type}</span>
+                    <span className="truncate text-muted-foreground">{d.judge_names}</span>
+                    <span>{d.item_count ?? "—"}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {(d.parse_confidence_reasons ?? []).join(", ")}
+                    </span>
+                  </Link>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+        <PaginationBar
+          offset={list.offset}
+          count={list.items.length}
+          hasMore={list.hasMore}
+          onPrev={list.prev}
+          onNext={list.next}
+        />
       </div>
     </div>
   );

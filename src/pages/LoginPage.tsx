@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export function LoginPage() {
   const { operator, login } = useAuth();
@@ -25,32 +28,28 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <form onSubmit={onSubmit} className="w-80 bg-white p-8 rounded-lg shadow-sm border border-slate-200">
-        <h1 className="text-lg font-semibold mb-6">NyayOps Console</h1>
-        {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
-        <label className="block text-sm mb-1 text-slate-600">Username</label>
-        <input
-          className="w-full mb-4 rounded border border-slate-300 px-3 py-2 text-sm"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoFocus
-        />
-        <label className="block text-sm mb-1 text-slate-600">Password</label>
-        <input
-          type="password"
-          className="w-full mb-6 rounded border border-slate-300 px-3 py-2 text-sm"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-slate-900 text-white py-2 text-sm disabled:opacity-50"
-        >
-          {submitting ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Card className="w-80">
+        <CardHeader>
+          <CardTitle>NyayOps Console</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-4">
+            {error && <div className="text-sm text-destructive">{error}</div>}
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">Username</label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted-foreground">Password</label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <Button type="submit" disabled={submitting} className="w-full">
+              {submitting ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

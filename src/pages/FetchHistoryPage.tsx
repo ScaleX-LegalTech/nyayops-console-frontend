@@ -1,48 +1,54 @@
-import { useEffect, useState } from "react";
-import { api, type FetchAttempt } from "@/lib/api";
+import { PaginationBar } from "@/components/ui/pagination";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { api } from "@/lib/api";
+import { usePaginatedList } from "@/lib/pagination";
 
 export function FetchHistoryPage() {
-  const [attempts, setAttempts] = useState<FetchAttempt[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .listFetchAttempts()
-      .then((res) => setAttempts(res.attempts))
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load history"));
-  }, []);
+  const list = usePaginatedList(
+    ["fetch-attempts"],
+    (limit, offset) => api.listFetchAttempts({ limit, offset }),
+    50,
+  );
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-2">Cause-List Fetch History</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Every index-call attempt, not just documents that were downloaded — new in console,
-        this had no admin route before.
+      <h1 className="mb-2 text-xl font-semibold">Cause-List Fetch History</h1>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Every index-call attempt, not just documents that were downloaded — new in console, this had
+        no admin route before.
       </p>
-      {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="p-3">Bench</th>
-              <th className="p-3">Date</th>
-              <th className="p-3">Row Count</th>
-              <th className="p-3">Attempted At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {attempts.map((a) => (
-              <tr key={a.id} className="border-t border-slate-100">
-                <td className="p-3">
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Bench</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Row Count</TableHead>
+              <TableHead>Attempted At</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.items.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell>
                   {a.court_type} / {a.source_bench_key}
-                </td>
-                <td className="p-3">{a.cause_list_date}</td>
-                <td className="p-3">{a.row_count}</td>
-                <td className="p-3 text-slate-500">{new Date(a.attempted_at).toLocaleString()}</td>
-              </tr>
+                </TableCell>
+                <TableCell>{a.cause_list_date}</TableCell>
+                <TableCell>{a.row_count}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(a.attempted_at).toLocaleString()}
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+        <PaginationBar
+          offset={list.offset}
+          count={list.items.length}
+          hasMore={list.hasMore}
+          onPrev={list.prev}
+          onNext={list.next}
+        />
       </div>
     </div>
   );

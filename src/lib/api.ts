@@ -1,3 +1,5 @@
+import type { Page } from "@/lib/pagination";
+
 const TOKEN_KEY = "console_token";
 
 export function getToken(): string | null {
@@ -30,6 +32,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json();
 }
 
+function qs(params: Record<string, string | number | boolean | undefined>): string {
+  const usp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") usp.set(key, String(value));
+  }
+  return usp.toString();
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ access_token: string }>("/auth/login", {
@@ -44,10 +54,13 @@ export const api = {
   metricsQuery: (service: string, series: string, window: string) =>
     request(`/metrics/query?service=${service}&series=${series}&window=${window}`),
 
-  listTenants: (includeDeleted = false) =>
-    request<{ tenants: Tenant[] }>(`/tenants?include_deleted=${includeDeleted}`),
+  listTenants: (params: { includeDeleted?: boolean; limit: number; offset: number }) =>
+    request<Page<Tenant>>(
+      `/tenants?${qs({ include_deleted: params.includeDeleted, limit: params.limit, offset: params.offset })}`,
+    ),
   getTenant: (id: string) => request<Tenant>(`/tenants/${id}`),
-  listTenantUsers: (id: string) => request<{ users: TenantUser[] }>(`/tenants/${id}/users`),
+  listTenantUsers: (id: string, limit: number, offset: number) =>
+    request<Page<TenantUser>>(`/tenants/${id}/users?${qs({ limit, offset })}`),
   setFreeze: (id: string, is_frozen: boolean) =>
     request(`/tenants/${id}/freeze`, { method: "PATCH", body: JSON.stringify({ is_frozen }) }),
   setBillingStatus: (id: string, billing_status: string) =>
@@ -77,21 +90,31 @@ export const api = {
   resetUserPassword: (tenantId: string, userId: string) =>
     request(`/tenants/${tenantId}/users/${userId}/reset-password`, { method: "POST" }),
 
-  listLowConfidence: () =>
-    request<{ documents: CauseListDocument[] }>("/cause-lists/low-confidence"),
+  listLowConfidence: (limit: number, offset: number) =>
+    request<Page<CauseListDocument>>(`/cause-lists/low-confidence?${qs({ limit, offset })}`),
+  getDocument: (id: string) =>
+    request<{ document: CauseListDocument; entries: CauseListEntry[] }>(
+      `/cause-lists/documents/${id}`,
+    ),
   downloadDocument: (id: string) => request<{ download_url: string }>(`/cause-lists/${id}/download`),
   correctEntry: (entryId: string, corrected_fields: Record<string, unknown>) =>
     request(`/cause-lists/entries/${entryId}/correct`, {
       method: "POST",
       body: JSON.stringify({ corrected_fields }),
     }),
-  listFetchAttempts: (params: { court_type?: string; source_bench_key?: string } = {}) => {
-    const qs = new URLSearchParams(params as Record<string, string>).toString();
-    return request<{ attempts: FetchAttempt[] }>(`/cause-lists/fetch-attempts?${qs}`);
-  },
-  listBenchConfigs: (courtType?: string) =>
-    request<{ configs: BenchConfig[] }>(
-      `/cause-lists/bench-configs${courtType ? `?court_type=${courtType}` : ""}`,
+  listFetchAttempts: (params: {
+    court_type?: string;
+    source_bench_key?: string;
+    limit: number;
+    offset: number;
+  }) => request<Page<FetchAttempt>>(`/cause-lists/fetch-attempts?${qs(params)}`),
+  listJobs: (params: { status?: string; adapter?: string; limit: number; offset: number }) =>
+    request<Page<SyncJob>>(
+      `/cause-lists/jobs?${qs({ status_filter: params.status, adapter: params.adapter, limit: params.limit, offset: params.offset })}`,
+    ),
+  listBenchConfigs: (courtType: string | undefined, limit: number, offset: number) =>
+    request<Page<BenchConfig>>(
+      `/cause-lists/bench-configs?${qs({ court_type: courtType, limit, offset })}`,
     ),
   upsertBenchConfig: (body: Partial<BenchConfig> & { court_type: string; bench_key: string }) =>
     request("/cause-lists/bench-configs", { method: "POST", body: JSON.stringify(body) }),
@@ -99,6 +122,10 @@ export const api = {
   getSettings: () => request<Record<string, unknown>>("/settings"),
   setSetting: (key: string, value: unknown) =>
     request(`/settings/${key}`, { method: "PATCH", body: JSON.stringify(value) }),
+
+  getPlatformSettings: () => request<PlatformSettings>("/platform-settings"),
+  setPlatformSettings: (patch: Partial<Pick<PlatformSettings, "virus_scan_enabled" | "otp_email_enabled">>) =>
+    request<PlatformSettings>("/platform-settings", { method: "PATCH", body: JSON.stringify(patch) }),
 };
 
 export interface Tenant {
@@ -147,6 +174,28 @@ export interface CauseListDocument {
   fetched_at: string;
 }
 
+export interface CauseListEntry {
+  id: string;
+  document_id: string;
+  item_number: number;
+  companion_ordinal: number;
+  case_number_raw: string;
+  party_names_raw: string | null;
+  court_number: string | null;
+  cnr_on_list: string | null;
+  is_eliminated: boolean;
+  matched_case_id: string | null;
+  match_method: string;
+  match_confidence: number | null;
+  case_category: string | null;
+  linked_case_number: string | null;
+  link_type: string | null;
+  is_companion: boolean;
+  remark_text: string | null;
+  source_reference_code: string | null;
+  advocates_raw: string[] | null;
+}
+
 export interface FetchAttempt {
   id: string;
   court_type: string;
@@ -165,4 +214,23 @@ export interface BenchConfig {
   fetch_civil: boolean;
   fetch_criminal: boolean;
   enabled_list_types: string[] | null;
+}
+
+export interface SyncJob {
+  id: string;
+  case_id: string;
+  adapter: string;
+  order_id: string | null;
+  status: string;
+  attempts: number;
+  error_code: string | null;
+  last_error: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface PlatformSettings {
+  virus_scan_enabled: boolean;
+  otp_email_enabled: boolean;
+  updated_at: string;
 }
