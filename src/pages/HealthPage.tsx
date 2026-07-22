@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ServiceSection } from "@/components/ServiceSection";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,6 +141,8 @@ export function HealthPage() {
     queryFn: () => api.health(),
     refetchInterval: 15_000,
   });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeService = searchParams.get("service");
 
   return (
     <div>
@@ -147,9 +150,18 @@ export function HealthPage() {
       <div className="space-y-6">
         {health.data &&
           Object.entries(health.data).map(([service, h], i) => (
-            // Only first section open by default - same lag fix as MonitoringPage
-            // (JobsTable's own paginated query only fires once CDE section is open too).
-            <ServiceSection key={service} service={service} status={h.status} defaultOpen={i === 0}>
+            // Open section driven by the sidebar's Main/CDE sub-links (?service=...);
+            // falls back to "first section only" otherwise (JobsTable's paginated query
+            // only fires once the CDE section is actually open).
+            <ServiceSection
+              key={service}
+              service={service}
+              status={h.status}
+              open={activeService ? activeService === service : i === 0}
+              onOpenChange={(isOpen) => {
+                setSearchParams(isOpen ? { service } : {}, { replace: true });
+              }}
+            >
               <ServiceCard health={h} />
               {service === "cde" && <JobsTable />}
             </ServiceSection>

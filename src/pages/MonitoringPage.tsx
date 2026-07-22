@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MetricChart } from "@/components/MetricChart";
 import { ServiceSection } from "@/components/ServiceSection";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ const WINDOWS = ["1h", "6h", "24h", "7d"] as const;
 
 export function MonitoringPage() {
   const [window, setWindow] = useState<(typeof WINDOWS)[number]>("6h");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeService = searchParams.get("service");
 
   return (
     <div className="space-y-6">
@@ -38,11 +41,17 @@ export function MonitoringPage() {
       </div>
 
       {Object.entries(SERIES).map(([service, seriesList], i) => (
-        // Only the first section's charts mount by default - keeps the initial load to
-        // one service's worth of simultaneous chart queries instead of firing all 9 at
-        // once (confirmed live: 9 concurrent /metrics/query calls on mount was a real
-        // source of the reported lag).
-        <ServiceSection key={service} service={service} defaultOpen={i === 0}>
+        // Open section driven by the sidebar's Main/CDE sub-links (?service=...); falls
+        // back to "first section only" when landing here with no service picked - keeps
+        // the initial load to one service's charts instead of firing all 9 queries at once.
+        <ServiceSection
+          key={service}
+          service={service}
+          open={activeService ? activeService === service : i === 0}
+          onOpenChange={(isOpen) => {
+            setSearchParams(isOpen ? { service } : {}, { replace: true });
+          }}
+        >
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {seriesList.map((s) => (
               <MetricChart key={s.key} title={s.label} service={service} series={s.key} window={window} />

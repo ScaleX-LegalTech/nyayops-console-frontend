@@ -1,6 +1,7 @@
 import {
   Activity,
   Building2,
+  ChevronRight,
   ChevronsUpDown,
   ClipboardList,
   Gavel,
@@ -13,6 +14,7 @@ import {
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,14 +33,25 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/theme";
 
+// Health/Monitoring both break down by service (Main = backend, CDE = the scraper
+// service) - nested here so the sidebar itself can jump straight to a service's
+// section instead of only the page defaulting to "first section open".
+const SERVICE_CHILDREN = [
+  { service: "backend", label: "Main" },
+  { service: "cde", label: "CDE" },
+];
+
 const NAV = [
-  { to: "/health", label: "Health", icon: Activity },
-  { to: "/monitoring", label: "Monitoring", icon: Gavel },
+  { to: "/health", label: "Health", icon: Activity, children: SERVICE_CHILDREN },
+  { to: "/monitoring", label: "Monitoring", icon: Gavel, children: SERVICE_CHILDREN },
   { to: "/tenants", label: "Tenants", icon: Building2 },
   { to: "/cause-lists/review", label: "Cause-List Review", icon: ClipboardList },
   { to: "/cause-lists/fetch-history", label: "Fetch History", icon: History },
@@ -70,20 +83,50 @@ export function Layout() {
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {NAV.map((item) => (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={item.label}
-                      isActive={location.pathname.startsWith(item.to)}
-                    >
-                      <NavLink to={item.to}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {NAV.map((item) => {
+                  const onPage = location.pathname.startsWith(item.to);
+                  const activeService = onPage ? new URLSearchParams(location.search).get("service") : null;
+
+                  if (!item.children) {
+                    return (
+                      <SidebarMenuItem key={item.to}>
+                        <SidebarMenuButton asChild tooltip={item.label} isActive={onPage}>
+                          <NavLink to={item.to}>
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  }
+
+                  return (
+                    <Collapsible key={item.to} defaultOpen={onPage} className="group/collapsible">
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton tooltip={item.label} isActive={onPage && !activeService}>
+                            <item.icon />
+                            <span>{item.label}</span>
+                            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            {item.children.map((child) => (
+                              <SidebarMenuSubItem key={child.service}>
+                                <SidebarMenuSubButton asChild isActive={onPage && activeService === child.service}>
+                                  <NavLink to={`${item.to}?service=${child.service}`}>
+                                    <span>{child.label}</span>
+                                  </NavLink>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
