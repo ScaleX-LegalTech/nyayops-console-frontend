@@ -84,8 +84,8 @@ function JobsTable() {
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="queued">Queued</SelectItem>
-            <SelectItem value="running">Running</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="in_progress">In progress</SelectItem>
+            <SelectItem value="complete">Complete</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
@@ -114,7 +114,7 @@ function JobsTable() {
             {jobs.items.map((j) => (
               <TableRow key={j.id}>
                 <TableCell>
-                  <Badge variant={j.status === "failed" ? "destructive" : j.status === "completed" ? "success" : "secondary"}>
+                  <Badge variant={j.status === "failed" ? "destructive" : j.status === "complete" ? "success" : "secondary"}>
                     {j.status}
                   </Badge>
                 </TableCell>
