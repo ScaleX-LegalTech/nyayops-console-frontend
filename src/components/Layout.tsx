@@ -54,7 +54,7 @@ const NAV = [
   { to: "/health", label: "Health", icon: Activity, children: SERVICE_CHILDREN },
   { to: "/monitoring", label: "Monitoring", icon: Gavel, children: SERVICE_CHILDREN },
   { to: "/tenants", label: "Tenants", icon: Building2 },
-  { to: "/cause-lists/review", label: "Cause-List Review", icon: ClipboardList },
+  { to: "/cause-lists/review", label: "Cause Lists", icon: ClipboardList },
   { to: "/cause-lists/fetch-history", label: "Fetch History", icon: History },
   { to: "/bench-configs", label: "Bench Configs", icon: Gavel },
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock },
