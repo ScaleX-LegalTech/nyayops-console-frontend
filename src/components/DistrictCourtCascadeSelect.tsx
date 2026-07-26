@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,9 @@ export function useCourtDirectory() {
     api
       .listCourtDirectory()
       .then((r) => setEntries(r.items))
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Failed to load court directory");
+      })
       .finally(() => setLoading(false));
   }, []);
   return { entries, loading };

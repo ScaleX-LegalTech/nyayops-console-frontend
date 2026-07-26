@@ -44,6 +44,8 @@ function useJobSchedules() {
     try {
       const { items } = await api.listJobSchedules();
       setItems(items);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load job schedules");
     } finally {
       setLoading(false);
     }

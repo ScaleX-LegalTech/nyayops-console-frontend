@@ -142,6 +142,7 @@ function BenchConfigsCard() {
           </label>
           <Button type="submit">Save</Button>
         </form>
+        {list.error && <p className="mt-2 text-sm text-destructive">{list.error.message}</p>}
       </CardContent>
 
       <div className="rounded-lg border-t bg-card">
@@ -210,8 +211,12 @@ function BenchConfigsCard() {
 function useRegionConfigs() {
   const [items, setItems] = useState<RegionConfig[]>([]);
   async function refetch() {
-    const { items } = await api.listRegionConfigs();
-    setItems(items);
+    try {
+      const { items } = await api.listRegionConfigs();
+      setItems(items);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load region configs");
+    }
   }
   useEffect(() => {
     void refetch();
