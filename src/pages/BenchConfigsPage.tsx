@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, type BenchConfig, type RegionConfig } from "@/lib/api";
-import { benchDisplay, KNOWN_BENCHES } from "@/lib/benches";
+import { benchDisplay, CAUSE_LIST_SUPPORTED_BENCHES, KNOWN_BENCHES } from "@/lib/benches";
 import { usePaginatedList } from "@/lib/pagination";
 
 const COURT_TYPES = ["high_court", "district_court"] as const;
@@ -58,6 +58,21 @@ function BenchConfigsCard() {
       await list.refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function remove(c: BenchConfig) {
+    const key = `${c.court_type}:${c.bench_key}`;
+    if (!window.confirm(`Remove config for ${c.bench_key}? This stops it from being fetched.`)) return;
+    setBusyKey(key);
+    try {
+      await api.deleteBenchConfig(c.court_type, c.bench_key, c.court_name_code);
+      toast.success("Config removed");
+      await list.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
     } finally {
       setBusyKey(null);
     }
@@ -110,9 +125,10 @@ function BenchConfigsCard() {
               <Select value={form.bench_key || undefined} onValueChange={(v) => setForm({ ...form, bench_key: v })}>
                 <SelectTrigger size="sm" className="w-56"><SelectValue placeholder="Select bench" /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
-                    <SelectItem key={key} value={key}>{b.courtGroup} — {b.label}</SelectItem>
-                  ))}
+                  {CAUSE_LIST_SUPPORTED_BENCHES.map((key) => {
+                    const b = KNOWN_BENCHES[key];
+                    return <SelectItem key={key} value={key}>{b.courtGroup} — {b.label}</SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -154,13 +170,14 @@ function BenchConfigsCard() {
               <TableHead>Enabled</TableHead>
               <TableHead>Civil</TableHead>
               <TableHead>Criminal</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {Array.from(grouped.entries()).map(([courtGroup, configs]) => (
               <Fragment key={courtGroup}>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableCell colSpan={5} className="py-1.5 text-xs font-semibold text-muted-foreground">
+                  <TableCell colSpan={6} className="py-1.5 text-xs font-semibold text-muted-foreground">
                     {courtGroup}
                   </TableCell>
                 </TableRow>
@@ -188,6 +205,11 @@ function BenchConfigsCard() {
                           disabled={busy}
                           onCheckedChange={() => toggle(c, "fetch_criminal")}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" disabled={busy} onClick={() => remove(c)}>
+                          Remove
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

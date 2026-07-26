@@ -134,6 +134,10 @@ export const api = {
     ),
   upsertBenchConfig: (body: Partial<BenchConfig> & { court_type: string; bench_key: string }) =>
     request("/cause-lists/bench-configs", { method: "POST", body: JSON.stringify(body) }),
+  deleteBenchConfig: (courtType: string, benchKey: string, courtNameCode: string | null) =>
+    request(`/cause-lists/bench-configs?${qs({ court_type: courtType, bench_key: benchKey, court_name_code: courtNameCode ?? undefined })}`, {
+      method: "DELETE",
+    }),
   listCourtDirectory: () => request<{ items: CourtDirectoryEntry[] }>("/cause-lists/court-directory"),
 
   listJobSchedules: () => request<{ items: JobSchedule[] }>("/cause-lists/job-schedules"),

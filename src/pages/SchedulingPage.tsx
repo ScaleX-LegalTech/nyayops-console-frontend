@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, type JobSchedule } from "@/lib/api";
-import { KNOWN_BENCHES } from "@/lib/benches";
+import { CAUSE_LIST_SUPPORTED_BENCHES, KNOWN_BENCHES } from "@/lib/benches";
 
 // One-line summary of what each dynamic job actually does -- sourced from each job's
 // own docstring in extraction/cause_list/jobs/*.py (CDE repo), condensed for the ops
@@ -268,9 +268,10 @@ function TriggerCard() {
               <Select value={benchKey || undefined} onValueChange={setBenchKey}>
                 <SelectTrigger size="sm" className="w-56"><SelectValue placeholder="Select bench" /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
-                    <SelectItem key={key} value={key}>{b.courtGroup} — {b.label}</SelectItem>
-                  ))}
+                  {CAUSE_LIST_SUPPORTED_BENCHES.map((key) => {
+                    const b = KNOWN_BENCHES[key];
+                    return <SelectItem key={key} value={key}>{b.courtGroup} — {b.label}</SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
             </div>

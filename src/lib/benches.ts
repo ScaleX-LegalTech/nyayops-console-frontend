@@ -16,6 +16,23 @@ export const KNOWN_BENCHES: Record<string, { courtGroup: string; label: string }
   allahabad_main: { courtGroup: "Allahabad High Court", label: "Allahabad High Court" },
 };
 
+/** Only these 7 have a registered cause-list PDF parser in CDE (confirmed live
+ * 2026-07-27: extraction/cause_list/parsers/pdf/__init__.py only imports the bombay
+ * package -- resolve_parser("13")/"16"/"10"/"3" all miss). Enrolling any other bench
+ * in bench_cause_list_configs just wastes portal fetches on documents that can never
+ * parse -- happened once already (allahabad_main), hence this list gating the Court
+ * Config / Manual Refresh bench dropdowns specifically. KNOWN_BENCHES above stays
+ * the full registry for everything else (health, case search, Fetch History display). */
+export const CAUSE_LIST_SUPPORTED_BENCHES = [
+  "bombay_mumbai",
+  "bombay_2",
+  "bombay_aurangabad",
+  "bombay_nagpur",
+  "bombay_goa",
+  "bombay_torts",
+  "bombay_kolhapur",
+] as const;
+
 export function benchDisplay(benchKey: string): { courtGroup: string; label: string } {
   return KNOWN_BENCHES[benchKey] ?? { courtGroup: benchKey, label: benchKey };
 }
