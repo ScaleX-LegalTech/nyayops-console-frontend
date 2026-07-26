@@ -1,4 +1,4 @@
-import { Navigate, Route, HashRouter, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/auth/AuthContext";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import { Layout } from "@/components/Layout";
@@ -18,7 +18,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 
 export default function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
@@ -42,6 +42,6 @@ export default function App() {
           </Routes>
         </TooltipProvider>
       </AuthProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
