@@ -13,6 +13,7 @@ import { CauseListReviewPage } from "@/pages/CauseListReviewPage";
 import { CauseListDocumentPage } from "@/pages/CauseListDocumentPage";
 import { FetchHistoryPage } from "@/pages/FetchHistoryPage";
 import { BenchConfigsPage } from "@/pages/BenchConfigsPage";
+import { SchedulingPage } from "@/pages/SchedulingPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
                 <Route path="/cause-lists/review/:documentId" element={<CauseListDocumentPage />} />
                 <Route path="/cause-lists/fetch-history" element={<FetchHistoryPage />} />
                 <Route path="/bench-configs" element={<BenchConfigsPage />} />
+                <Route path="/scheduling" element={<SchedulingPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Route>

@@ -1,6 +1,7 @@
 import {
   Activity,
   Building2,
+  CalendarClock,
   ChevronRight,
   ChevronsUpDown,
   ClipboardList,
@@ -56,6 +57,7 @@ const NAV = [
   { to: "/cause-lists/review", label: "Cause-List Review", icon: ClipboardList },
   { to: "/cause-lists/fetch-history", label: "Fetch History", icon: History },
   { to: "/bench-configs", label: "Bench Configs", icon: Gavel },
+  { to: "/scheduling", label: "Scheduling", icon: CalendarClock },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 

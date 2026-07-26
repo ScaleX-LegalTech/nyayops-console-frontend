@@ -135,6 +135,25 @@ export const api = {
   upsertBenchConfig: (body: Partial<BenchConfig> & { court_type: string; bench_key: string }) =>
     request("/cause-lists/bench-configs", { method: "POST", body: JSON.stringify(body) }),
 
+  listJobSchedules: () => request<{ items: JobSchedule[] }>("/cause-lists/job-schedules"),
+  updateJobSchedule: (taskName: string, patch: Partial<JobSchedule>) =>
+    request<JobSchedule>(`/cause-lists/job-schedules/${taskName}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  listRegionConfigs: () => request<{ items: RegionConfig[] }>("/cause-lists/region-configs"),
+  upsertRegionConfig: (body: { court_type: string; state_code: string; enabled: boolean }) =>
+    request<RegionConfig>("/cause-lists/region-configs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  triggerCauseListFetch: (body: {
+    court_type: string;
+    cause_list_date: string;
+    bench_key?: string;
+    court_name_code?: string;
+  }) => request("/cause-lists/trigger", { method: "POST", body: JSON.stringify(body) }),
+
   getSettings: () => request<Record<string, unknown>>("/settings"),
   setSetting: (key: string, value: unknown) =>
     request(`/settings/${key}`, { method: "PATCH", body: JSON.stringify(value) }),
@@ -230,6 +249,23 @@ export interface BenchConfig {
   fetch_civil: boolean;
   fetch_criminal: boolean;
   enabled_list_types: string[] | null;
+}
+
+export interface JobSchedule {
+  task_name: string;
+  enabled: boolean;
+  hours: number[] | null;
+  minutes: number[];
+  weekdays: number[] | null;
+  params: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface RegionConfig {
+  id: string;
+  court_type: string;
+  state_code: string;
+  enabled: boolean;
 }
 
 export interface SyncJob {
