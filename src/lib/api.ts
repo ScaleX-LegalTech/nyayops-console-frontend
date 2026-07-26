@@ -95,26 +95,26 @@ export const api = {
   resetUserPassword: (tenantId: string, userId: string) =>
     request(`/tenants/${tenantId}/users/${userId}/reset-password`, { method: "POST" }),
 
-  listLowConfidence: (params: {
+  listDocuments: (params: {
     court_type?: string;
     bench_key?: string;
     list_type?: string;
     cause_list_date?: string;
+    parse_status?: string;
     sort_by?: string;
     sort_dir?: string;
     limit: number;
     offset: number;
-  }) => request<Page<CauseListDocument>>(`/cause-lists/low-confidence?${qs(params)}`),
+  }) => request<Page<CauseListDocument>>(`/cause-lists/documents?${qs(params)}`),
   getDocument: (id: string) =>
     request<{ document: CauseListDocument; entries: CauseListEntry[] }>(
       `/cause-lists/documents/${id}`,
     ),
   downloadDocument: (id: string) => request<{ download_url: string }>(`/cause-lists/${id}/download`),
-  correctEntry: (entryId: string, corrected_fields: Record<string, unknown>) =>
-    request(`/cause-lists/entries/${entryId}/correct`, {
-      method: "POST",
-      body: JSON.stringify({ corrected_fields }),
-    }),
+  updateEntry: (
+    entryId: string,
+    patch: Partial<Pick<CauseListEntry, "case_number" | "item_number" | "list_section" | "is_eliminated">>,
+  ) => request(`/cause-lists/entries/${entryId}`, { method: "PATCH", body: JSON.stringify(patch) }),
   listFetchAttempts: (params: {
     court_type?: string;
     source_bench_key?: string;
@@ -200,35 +200,30 @@ export interface CauseListDocument {
   source_bench_key: string;
   cause_list_date: string;
   list_type: string;
+  list_type_raw: string;
   judge_names: string;
+  sitting_time: string | null;
   parse_status: string;
-  parse_confidence: string | null;
-  parse_confidence_reasons: string[] | null;
-  tier2_confidence: string | null;
   item_count: number | null;
   fetched_at: string;
 }
 
+// CauseListEntry is minimal by CDE's own 2026-07-26 redesign -- party/advocate/case-
+// identity fields moved onto the linked Case, not stored on the entry itself.
+// linked_case_cnr/linked_case_registration_number are read-only display fields from a
+// LEFT JOIN (console_backend/infrastructure/adapters/cde.py), not real entry columns.
 export interface CauseListEntry {
   id: string;
   document_id: string;
-  item_number: number;
-  companion_ordinal: number;
-  case_number_raw: string;
-  party_names_raw: string | null;
-  court_number: string | null;
-  cnr_on_list: string | null;
+  item_number: number | null;
+  case_number: string;
+  page_number: number | null;
+  line_index: number | null;
+  list_section: string | null;
   is_eliminated: boolean;
-  matched_case_id: string | null;
-  match_method: string;
-  match_confidence: number | null;
-  case_category: string | null;
-  linked_case_number: string | null;
-  link_type: string | null;
-  is_companion: boolean;
-  remark_text: string | null;
-  source_reference_code: string | null;
-  advocates_raw: string[] | null;
+  linked_case_id: string | null;
+  linked_case_cnr: string | null;
+  linked_case_registration_number: string | null;
 }
 
 export interface FetchAttempt {

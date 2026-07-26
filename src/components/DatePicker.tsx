@@ -28,34 +28,43 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", class
   const selected = toDate(value);
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn("w-40 justify-start font-normal", !value && "text-muted-foreground", className)}
+    <div className={cn("relative", className)}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn("w-40 justify-start font-normal", !value && "text-muted-foreground", value && "pr-7")}
+          >
+            <CalendarIcon className="size-4" />
+            <span className="truncate">{selected ? selected.toLocaleDateString() : placeholder}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={selected}
+            onSelect={(date) => onChange(date ? toIso(date) : "")}
+            defaultMonth={selected}
+          />
+        </PopoverContent>
+      </Popover>
+      {value && (
+        // Deliberately NOT nested inside PopoverTrigger -- Radix attaches its own
+        // pointerdown-level open/close handling directly to the trigger element,
+        // which fires independently of React's synthetic onClick/stopPropagation.
+        // An inner X button there both cleared the value AND re-toggled the popover
+        // (confirmed live: click did nothing visible, or reopened immediately).
+        // As a fully separate sibling, Radix's trigger listeners never see this click.
+        <button
+          type="button"
+          aria-label="Clear date"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 opacity-60 hover:opacity-100"
+          onClick={() => onChange("")}
         >
-          <CalendarIcon className="size-4" />
-          <span className="truncate">{selected ? selected.toLocaleDateString() : placeholder}</span>
-          {value && (
-            <XIcon
-              className="ml-auto size-3.5 shrink-0 opacity-60 hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange("");
-              }}
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={(date) => onChange(date ? toIso(date) : "")}
-          defaultMonth={selected}
-        />
-      </PopoverContent>
-    </Popover>
+          <XIcon className="size-3.5" />
+        </button>
+      )}
+    </div>
   );
 }

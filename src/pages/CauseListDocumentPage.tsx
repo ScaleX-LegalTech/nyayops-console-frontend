@@ -7,86 +7,55 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { api, type CauseListEntry } from "@/lib/api";
 
-const LINK_TYPES = ["none", "with", "in"] as const;
-
+// CauseListEntry is minimal by CDE's own 2026-07-26 redesign -- only these four
+// fields are the entry's own; party/advocate/case-identity now live on the linked
+// Case, shown read-only below (editing the link itself is a separate feature).
 interface FormState {
-  case_number_raw: string;
-  case_category: string;
-  remark_text: string;
-  court_number: string;
-  party_names_raw: string;
-  advocates_raw: string;
-  linked_case_number: string;
-  link_type: (typeof LINK_TYPES)[number];
-  is_companion: boolean;
-  cnr_on_list: string;
+  case_number: string;
+  item_number: string;
+  list_section: string;
+  is_eliminated: boolean;
 }
 
 function toForm(entry: CauseListEntry): FormState {
   return {
-    case_number_raw: entry.case_number_raw ?? "",
-    case_category: entry.case_category ?? "",
-    remark_text: entry.remark_text ?? "",
-    court_number: entry.court_number ?? "",
-    party_names_raw: entry.party_names_raw ?? "",
-    advocates_raw: (entry.advocates_raw ?? []).join("\n"),
-    linked_case_number: entry.linked_case_number ?? "",
-    link_type: (entry.link_type as (typeof LINK_TYPES)[number]) ?? "none",
-    is_companion: entry.is_companion,
-    cnr_on_list: entry.cnr_on_list ?? "",
+    case_number: entry.case_number ?? "",
+    item_number: entry.item_number?.toString() ?? "",
+    list_section: entry.list_section ?? "",
+    is_eliminated: entry.is_eliminated,
   };
 }
 
 function diff(entry: CauseListEntry, form: FormState): Record<string, unknown> {
   const changed: Record<string, unknown> = {};
   const original = toForm(entry);
-  if (form.case_number_raw !== original.case_number_raw) changed.case_number_raw = form.case_number_raw;
-  if (form.case_category !== original.case_category) changed.case_category = form.case_category || null;
-  // Field name must match the model column (remark_text) exactly - correct_entry's
-  // setattr(entry, field_name, value) writes whatever key is given verbatim, no
-  // remapping. The old dashboard sent "remark" (the serializer's read-side key) here,
-  // which silently no-ops - confirmed live while testing this page.
-  if (form.remark_text !== original.remark_text) changed.remark_text = form.remark_text || null;
-  if (form.court_number !== original.court_number) changed.court_number = form.court_number || null;
-  if (form.party_names_raw !== original.party_names_raw)
-    changed.party_names_raw = form.party_names_raw || null;
-  if (form.advocates_raw !== original.advocates_raw)
-    changed.advocates_raw = form.advocates_raw
-      ? form.advocates_raw.split("\n").map((s) => s.trim()).filter(Boolean)
-      : [];
-  if (form.linked_case_number !== original.linked_case_number)
-    changed.linked_case_number = form.linked_case_number || null;
-  if (form.link_type !== original.link_type)
-    changed.link_type = form.link_type === "none" ? null : form.link_type;
-  if (form.is_companion !== original.is_companion) changed.is_companion = form.is_companion;
-  if (form.cnr_on_list !== original.cnr_on_list) changed.cnr_on_list = form.cnr_on_list || null;
+  if (form.case_number !== original.case_number) changed.case_number = form.case_number;
+  if (form.item_number !== original.item_number) {
+    const n = Number(form.item_number);
+    if (!Number.isNaN(n)) changed.item_number = n;
+  }
+  if (form.list_section !== original.list_section) changed.list_section = form.list_section || null;
+  if (form.is_eliminated !== original.is_eliminated) changed.is_eliminated = form.is_eliminated;
   return changed;
 }
 
-function EntryCorrectionForm({ entry }: { entry: CauseListEntry }) {
+function EntryEditForm({ entry }: { entry: CauseListEntry }) {
   const [form, setForm] = useState<FormState>(() => toForm(entry));
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
 
   async function save() {
-    const corrected_fields = diff(entry, form);
-    if (Object.keys(corrected_fields).length === 0) {
+    const patch = diff(entry, form);
+    if (Object.keys(patch).length === 0) {
       toast.info("No changes to save");
       return;
     }
     setSaving(true);
     try {
-      await api.correctEntry(entry.id, corrected_fields);
-      toast.success(`Entry ${entry.item_number} saved`);
+      await api.updateEntry(entry.id, patch);
+      toast.success(`Entry ${entry.item_number ?? entry.id.slice(0, 8)} saved`);
       await queryClient.invalidateQueries({ queryKey: ["cause-list-document", entry.document_id] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed");
@@ -99,63 +68,44 @@ function EntryCorrectionForm({ entry }: { entry: CauseListEntry }) {
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">
-          Item {entry.item_number}
-          {entry.companion_ordinal > 0 && <span className="text-muted-foreground"> (companion {entry.companion_ordinal})</span>}
+          Item {entry.item_number ?? "—"}
         </CardTitle>
-        <Badge variant={entry.match_method === "unmatched" ? "warning" : "success"}>{entry.match_method}</Badge>
+        <Badge variant={entry.linked_case_id ? "success" : "warning"}>
+          {entry.linked_case_id ? "linked" : "unlinked"}
+        </Badge>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         <Field label="Case number">
-          <Input value={form.case_number_raw} onChange={(e) => setForm({ ...form, case_number_raw: e.target.value })} />
+          <Input value={form.case_number} onChange={(e) => setForm({ ...form, case_number: e.target.value })} />
         </Field>
-        <Field label="Case category">
-          <Input value={form.case_category} onChange={(e) => setForm({ ...form, case_category: e.target.value })} />
-        </Field>
-        <Field label="Remark">
-          <Input value={form.remark_text} onChange={(e) => setForm({ ...form, remark_text: e.target.value })} />
-        </Field>
-        <Field label="Court number">
-          <Input value={form.court_number} onChange={(e) => setForm({ ...form, court_number: e.target.value })} />
-        </Field>
-        <Field label="Party names">
-          <Input value={form.party_names_raw} onChange={(e) => setForm({ ...form, party_names_raw: e.target.value })} />
-        </Field>
-        <Field label="Advocates (one per line)">
-          <textarea
-            className="w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs"
-            rows={2}
-            value={form.advocates_raw}
-            onChange={(e) => setForm({ ...form, advocates_raw: e.target.value })}
-          />
-        </Field>
-        <Field label="Linked case number">
+        <Field label="Item number">
           <Input
-            value={form.linked_case_number}
-            onChange={(e) => setForm({ ...form, linked_case_number: e.target.value })}
+            type="number"
+            value={form.item_number}
+            onChange={(e) => setForm({ ...form, item_number: e.target.value })}
           />
         </Field>
-        <Field label="Link type">
-          <Select value={form.link_type} onValueChange={(v) => setForm({ ...form, link_type: v as FormState["link_type"] })}>
-            <SelectTrigger size="sm" className="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {LINK_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="CNR on list">
-          <Input value={form.cnr_on_list} onChange={(e) => setForm({ ...form, cnr_on_list: e.target.value })} />
+        <Field label="List section">
+          <Input
+            value={form.list_section}
+            onChange={(e) => setForm({ ...form, list_section: e.target.value })}
+            placeholder="e.g. Evidence, Hearing"
+          />
         </Field>
         <label className="flex items-center gap-2 pt-1">
-          <Checkbox checked={form.is_companion} onCheckedChange={(v) => setForm({ ...form, is_companion: !!v })} />
-          Is companion
+          <Checkbox
+            checked={form.is_eliminated}
+            onCheckedChange={(v) => setForm({ ...form, is_eliminated: !!v })}
+          />
+          Eliminated from list
         </label>
-        {entry.source_reference_code && (
-          <p className="text-xs text-muted-foreground">Source reference: {entry.source_reference_code}</p>
+        {entry.linked_case_id && (
+          <p className="text-xs text-muted-foreground">
+            Linked case: {entry.linked_case_cnr ?? entry.linked_case_registration_number ?? entry.linked_case_id}
+          </p>
         )}
         <Button size="sm" className="mt-2 w-full" disabled={saving} onClick={save}>
-          {saving ? "Saving..." : "Save correction"}
+          {saving ? "Saving..." : "Save"}
         </Button>
       </CardContent>
     </Card>
@@ -205,15 +155,13 @@ export function CauseListDocumentPage() {
         <div className="mb-3 flex items-center justify-between">
           <div>
             <Link to="/cause-lists/review" className="text-sm text-muted-foreground hover:underline">
-              ← Back to review queue
+              ← Back to cause lists
             </Link>
             <h1 className="text-lg font-semibold">
               {document.court_type} / {document.source_bench_key} — {document.cause_list_date}
             </h1>
           </div>
-          <div className="text-right text-xs text-muted-foreground">
-            {(document.parse_confidence_reasons ?? []).join(", ")}
-          </div>
+          <div className="text-right text-xs text-muted-foreground">{document.parse_status}</div>
         </div>
         <div className="flex-1 overflow-hidden rounded-lg border bg-muted">
           {pdfUrl ? (
@@ -227,7 +175,7 @@ export function CauseListDocumentPage() {
       </div>
       <div className="w-[28rem] shrink-0 space-y-3 overflow-y-auto pr-1">
         {entries.map((entry) => (
-          <EntryCorrectionForm key={entry.id} entry={entry} />
+          <EntryEditForm key={entry.id} entry={entry} />
         ))}
       </div>
     </div>

@@ -22,10 +22,21 @@ const SORT_OPTIONS = [
 ];
 
 export function FetchHistoryPage() {
+  // Draft state (what's shown in the controls) is deliberately separate from applied
+  // state (what's actually passed into usePaginatedList's queryKey) -- every draft
+  // change used to write straight into the applied state, so react-query's queryKey
+  // changed and refetched on every keystroke/click, including a stray one from just
+  // opening the date picker. Only "Apply filters" copies draft -> applied now; sort
+  // stays immediate (a display option, not a filter -- conventionally applies right
+  // away, and wasn't what was reported as broken).
+  const [draftBenchKey, setDraftBenchKey] = useState("");
+  const [draftCauseListDate, setDraftCauseListDate] = useState("");
   const [benchKey, setBenchKey] = useState("");
   const [causeListDate, setCauseListDate] = useState("");
   const [sortBy, setSortBy] = useState("attempted_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const filtersDirty = draftBenchKey !== benchKey || draftCauseListDate !== causeListDate;
 
   const list = usePaginatedList(
     ["fetch-attempts", benchKey, causeListDate, sortBy, sortDir],
@@ -52,9 +63,9 @@ export function FetchHistoryPage() {
       <div className="mb-4 flex flex-wrap items-end gap-x-4 gap-y-3">
         <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Bench</label>
-          <Select value={benchKey || "all"} onValueChange={(v) => { setBenchKey(v === "all" ? "" : v); list.reset(); }}>
+          <Select value={draftBenchKey || "all"} onValueChange={(v) => setDraftBenchKey(v === "all" ? "" : v)}>
             <SelectTrigger size="sm" className="w-48">
-              <span className="truncate">{benchKey ? benchDisplay(benchKey).label : "All benches"}</span>
+              <span className="truncate">{draftBenchKey ? benchDisplay(draftBenchKey).label : "All benches"}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All benches</SelectItem>
@@ -68,7 +79,7 @@ export function FetchHistoryPage() {
         </div>
         <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Cause list date</label>
-          <DatePicker value={causeListDate} onChange={(v) => { setCauseListDate(v); list.reset(); }} />
+          <DatePicker value={draftCauseListDate} onChange={setDraftCauseListDate} />
         </div>
         <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Sort by</label>
@@ -90,6 +101,32 @@ export function FetchHistoryPage() {
               {sortDir === "asc" ? <ArrowUpAZ className="size-4" /> : <ArrowDownAZ className="size-4" />}
             </Button>
           </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            disabled={!filtersDirty}
+            onClick={() => {
+              setBenchKey(draftBenchKey);
+              setCauseListDate(draftCauseListDate);
+              list.reset();
+            }}
+          >
+            Apply filters
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setDraftBenchKey("");
+              setDraftCauseListDate("");
+              setBenchKey("");
+              setCauseListDate("");
+              list.reset();
+            }}
+          >
+            Clear filters
+          </Button>
         </div>
       </div>
 
