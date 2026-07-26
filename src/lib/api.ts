@@ -134,6 +134,7 @@ export const api = {
     ),
   upsertBenchConfig: (body: Partial<BenchConfig> & { court_type: string; bench_key: string }) =>
     request("/cause-lists/bench-configs", { method: "POST", body: JSON.stringify(body) }),
+  listCourtDirectory: () => request<{ items: CourtDirectoryEntry[] }>("/cause-lists/court-directory"),
 
   listJobSchedules: () => request<{ items: JobSchedule[] }>("/cause-lists/job-schedules"),
   updateJobSchedule: (taskName: string, patch: Partial<JobSchedule>) =>
@@ -233,6 +234,17 @@ export interface FetchAttempt {
   cause_list_date: string;
   row_count: number;
   attempted_at: string;
+}
+
+export interface CourtDirectoryEntry {
+  state_code: string;
+  state_name: string | null;
+  district_code: string | null;
+  district_name: string | null;
+  complex_code: string | null;
+  complex_name: string | null;
+  court_name_code: string;
+  court_name: string;
 }
 
 export interface BenchConfig {

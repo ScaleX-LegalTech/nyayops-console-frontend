@@ -1,6 +1,7 @@
 import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
 import { useState } from "react";
 import { DatePicker } from "@/components/DatePicker";
+import { DistrictCourtCascadeSelect, useCourtDirectory } from "@/components/DistrictCourtCascadeSelect";
 import { Button } from "@/components/ui/button";
 import { PaginationBar } from "@/components/ui/pagination";
 import {
@@ -20,29 +21,41 @@ const SORT_OPTIONS = [
   { value: "cause_list_date", label: "Cause list date" },
   { value: "row_count", label: "Row count" },
 ];
+const COURT_TYPES = ["all", "high_court", "district_court"] as const;
+const EMPTY_DISTRICT = { stateCode: "", districtCode: "", complexCode: "", courtNameCode: "" };
 
 export function FetchHistoryPage() {
+  const { entries: courtDirectory } = useCourtDirectory();
+
   // Draft state (what's shown in the controls) is deliberately separate from applied
-  // state (what's actually passed into usePaginatedList's queryKey) -- every draft
-  // change used to write straight into the applied state, so react-query's queryKey
-  // changed and refetched on every keystroke/click, including a stray one from just
-  // opening the date picker. Only "Apply filters" copies draft -> applied now; sort
-  // stays immediate (a display option, not a filter -- conventionally applies right
-  // away, and wasn't what was reported as broken).
+  // state (what's actually passed into usePaginatedList's queryKey) -- only "Apply
+  // filters" commits a change; sort stays immediate (a display option, not a filter).
+  const [draftCourtType, setDraftCourtType] = useState<(typeof COURT_TYPES)[number]>("all");
   const [draftBenchKey, setDraftBenchKey] = useState("");
+  const [draftDistrict, setDraftDistrict] = useState(EMPTY_DISTRICT);
   const [draftCauseListDate, setDraftCauseListDate] = useState("");
+
+  const [courtType, setCourtType] = useState<(typeof COURT_TYPES)[number]>("all");
   const [benchKey, setBenchKey] = useState("");
   const [causeListDate, setCauseListDate] = useState("");
   const [sortBy, setSortBy] = useState("attempted_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const filtersDirty = draftBenchKey !== benchKey || draftCauseListDate !== causeListDate;
+  const filtersDirty =
+    draftCourtType !== courtType || draftBenchKey !== benchKey || draftCauseListDate !== causeListDate;
+
+  // District Court's fetch task doesn't record CauseListFetchAttempt rows yet (a real
+  // gap, not this page's job to fix) -- this filter is wired through regardless, so it
+  // starts working the moment that gap closes without another UI change.
+  const sourceBenchKey =
+    courtType === "district_court" ? draftDistrict.courtNameCode || undefined : benchKey || undefined;
 
   const list = usePaginatedList(
-    ["fetch-attempts", benchKey, causeListDate, sortBy, sortDir],
+    ["fetch-attempts", courtType, benchKey, causeListDate, sortBy, sortDir],
     (limit, offset) =>
       api.listFetchAttempts({
-        source_bench_key: benchKey || undefined,
+        court_type: courtType === "all" ? undefined : courtType,
+        source_bench_key: sourceBenchKey,
         cause_list_date: causeListDate || undefined,
         sort_by: sortBy,
         sort_dir: sortDir,
@@ -51,6 +64,24 @@ export function FetchHistoryPage() {
       }),
     50,
   );
+
+  function applyFilters() {
+    setCourtType(draftCourtType);
+    setBenchKey(draftCourtType === "district_court" ? draftDistrict.courtNameCode : draftBenchKey);
+    setCauseListDate(draftCauseListDate);
+    list.reset();
+  }
+
+  function clearFilters() {
+    setDraftCourtType("all");
+    setDraftBenchKey("");
+    setDraftDistrict(EMPTY_DISTRICT);
+    setDraftCauseListDate("");
+    setCourtType("all");
+    setBenchKey("");
+    setCauseListDate("");
+    list.reset();
+  }
 
   return (
     <div>
@@ -62,21 +93,43 @@ export function FetchHistoryPage() {
 
       <div className="mb-4 flex flex-wrap items-end gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <label className="mb-1 block text-xs text-muted-foreground">Bench</label>
-          <Select value={draftBenchKey || "all"} onValueChange={(v) => setDraftBenchKey(v === "all" ? "" : v)}>
-            <SelectTrigger size="sm" className="w-48">
-              <span className="truncate">{draftBenchKey ? benchDisplay(draftBenchKey).label : "All benches"}</span>
-            </SelectTrigger>
+          <label className="mb-1 block text-xs text-muted-foreground">Court type</label>
+          <Select
+            value={draftCourtType}
+            onValueChange={(v) => {
+              setDraftCourtType(v as (typeof COURT_TYPES)[number]);
+              setDraftBenchKey("");
+              setDraftDistrict(EMPTY_DISTRICT);
+            }}
+          >
+            <SelectTrigger size="sm" className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All benches</SelectItem>
-              {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
-                <SelectItem key={key} value={key}>
-                  {b.courtGroup} — {b.label}
-                </SelectItem>
+              {COURT_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>{t === "all" ? "All court types" : t}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+        {draftCourtType === "district_court" ? (
+          <DistrictCourtCascadeSelect entries={courtDirectory} {...draftDistrict} onChange={setDraftDistrict} />
+        ) : (
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs text-muted-foreground">Bench</label>
+            <Select value={draftBenchKey || "all"} onValueChange={(v) => setDraftBenchKey(v === "all" ? "" : v)}>
+              <SelectTrigger size="sm" className="w-48">
+                <span className="truncate">{draftBenchKey ? benchDisplay(draftBenchKey).label : "All benches"}</span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All benches</SelectItem>
+                {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
+                  <SelectItem key={key} value={key}>
+                    {b.courtGroup} — {b.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="min-w-0">
           <label className="mb-1 block text-xs text-muted-foreground">Cause list date</label>
           <DatePicker value={draftCauseListDate} onChange={setDraftCauseListDate} />
@@ -103,28 +156,10 @@ export function FetchHistoryPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            disabled={!filtersDirty}
-            onClick={() => {
-              setBenchKey(draftBenchKey);
-              setCauseListDate(draftCauseListDate);
-              list.reset();
-            }}
-          >
+          <Button size="sm" disabled={!filtersDirty} onClick={applyFilters}>
             Apply filters
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setDraftBenchKey("");
-              setDraftCauseListDate("");
-              setBenchKey("");
-              setCauseListDate("");
-              list.reset();
-            }}
-          >
+          <Button size="sm" variant="outline" onClick={clearFilters}>
             Clear filters
           </Button>
         </div>

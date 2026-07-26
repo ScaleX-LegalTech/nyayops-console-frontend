@@ -1,11 +1,40 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { DatePicker } from "@/components/DatePicker";
+import { DistrictCourtCascadeSelect, useCourtDirectory } from "@/components/DistrictCourtCascadeSelect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { api, type JobSchedule, type RegionConfig } from "@/lib/api";
+import { api, type JobSchedule } from "@/lib/api";
+import { KNOWN_BENCHES } from "@/lib/benches";
+
+// One-line summary of what each dynamic job actually does -- sourced from each job's
+// own docstring in extraction/cause_list/jobs/*.py (CDE repo), condensed for the ops
+// console rather than copied verbatim.
+const TASK_DESCRIPTIONS: Record<string, string> = {
+  case_type_sync: "Refreshes each High Court bench's case-type dropdown options.",
+  cause_list_fetch_sweep:
+    "Fetches T+1..T+7 cause lists for every enabled High Court bench; re-checks a bench until its list stops changing.",
+  cause_list_retention_purge: "Deletes cause-list documents/entries outside the retention window.",
+  cause_list_t1_recheck: "Extra same-day recheck of just T+1/T+2 High Court lists, catching late changes.",
+  cnr_discovery_sweep: "Resolves unmatched cause-list rows into real cases via live CNR search.",
+  court_directory_sync: "Walks the District Court portal's state/district/complex/court-name hierarchy.",
+  district_cause_list_fetch_sweep: "Fetches T+1..T+7 cause lists for every enrolled District Court.",
+  retro_link_sweep: "Retroactively links previously-unmatched cause-list entries to cases added since.",
+};
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = [0, 15, 30, 45];
+const COURT_TYPES = ["high_court", "district_court"] as const;
 
 function useJobSchedules() {
   const [items, setItems] = useState<JobSchedule[]>([]);
@@ -25,22 +54,90 @@ function useJobSchedules() {
   return { items, loading, refetch };
 }
 
-function useRegionConfigs() {
-  const [items, setItems] = useState<RegionConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  async function refetch() {
-    setLoading(true);
+function HourMinuteEditor({
+  schedule,
+  onSaved,
+}: {
+  schedule: JobSchedule;
+  onSaved: () => Promise<void>;
+}) {
+  const [everyHour, setEveryHour] = useState(schedule.hours === null);
+  const [hours, setHours] = useState<Set<number>>(new Set(schedule.hours ?? []));
+  const [minutes, setMinutes] = useState<Set<number>>(new Set(schedule.minutes));
+  const [saving, setSaving] = useState(false);
+
+  function toggle(set: Set<number>, setSet: (s: Set<number>) => void, n: number) {
+    const next = new Set(set);
+    if (next.has(n)) next.delete(n);
+    else next.add(n);
+    setSet(next);
+  }
+
+  async function save() {
+    if (!everyHour && hours.size === 0) {
+      toast.error("Pick at least one hour, or choose \"every hour\"");
+      return;
+    }
+    if (minutes.size === 0) {
+      toast.error("Pick at least one minute");
+      return;
+    }
+    setSaving(true);
     try {
-      const { items } = await api.listRegionConfigs();
-      setItems(items);
+      await api.updateJobSchedule(schedule.task_name, {
+        hours: everyHour ? null : Array.from(hours).sort((a, b) => a - b),
+        minutes: Array.from(minutes).sort((a, b) => a - b),
+      });
+      await onSaved();
+      toast.success("Schedule updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
-  useEffect(() => {
-    void refetch();
-  }, []);
-  return { items, loading, refetch };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="text-left hover:underline">
+          {schedule.hours ? schedule.hours.join(", ") : "every hour"} @ {schedule.minutes.join(", ")}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 space-y-3" align="start">
+        <div>
+          <label className="mb-1 flex items-center gap-2 text-xs font-medium">
+            <Checkbox checked={everyHour} onCheckedChange={(v) => setEveryHour(!!v)} />
+            Every hour
+          </label>
+          {!everyHour && (
+            <div className="grid grid-cols-6 gap-1">
+              {HOURS.map((h) => (
+                <label key={h} className="flex items-center gap-1 text-xs">
+                  <Checkbox checked={hours.has(h)} onCheckedChange={() => toggle(hours, setHours, h)} />
+                  {h}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium">Minutes</p>
+          <div className="flex gap-3">
+            {MINUTES.map((m) => (
+              <label key={m} className="flex items-center gap-1 text-xs">
+                <Checkbox checked={minutes.has(m)} onCheckedChange={() => toggle(minutes, setMinutes, m)} />
+                {m}
+              </label>
+            ))}
+          </div>
+        </div>
+        <Button size="sm" className="w-full" disabled={saving} onClick={save}>
+          {saving ? "Saving..." : "Save"}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function JobSchedulesCard() {
@@ -70,15 +167,19 @@ function JobSchedulesCard() {
             <TableRow>
               <TableHead>Task</TableHead>
               <TableHead>Enabled</TableHead>
-              <TableHead>Hours</TableHead>
-              <TableHead>Minutes</TableHead>
+              <TableHead>Schedule</TableHead>
               <TableHead>Updated</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {schedules.items.map((s) => (
               <TableRow key={s.task_name}>
-                <TableCell className="font-mono text-sm">{s.task_name}</TableCell>
+                <TableCell>
+                  <span className="font-mono text-sm">{s.task_name}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {TASK_DESCRIPTIONS[s.task_name] ?? "—"}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Checkbox
                     checked={s.enabled}
@@ -87,9 +188,8 @@ function JobSchedulesCard() {
                   />
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {s.hours ? s.hours.join(", ") : "every hour"}
+                  <HourMinuteEditor schedule={s} onSaved={schedules.refetch} />
                 </TableCell>
-                <TableCell className="text-muted-foreground">{s.minutes.join(", ")}</TableCell>
                 <TableCell className="text-muted-foreground text-xs">
                   {new Date(s.updated_at).toLocaleString()}
                 </TableCell>
@@ -102,122 +202,35 @@ function JobSchedulesCard() {
   );
 }
 
-function RegionConfigsCard() {
-  const configs = useRegionConfigs();
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [form, setForm] = useState({ court_type: "", state_code: "" });
-
-  async function toggle(c: RegionConfig) {
-    const key = `${c.court_type}:${c.state_code}`;
-    setBusyKey(key);
-    try {
-      await api.upsertRegionConfig({ ...c, enabled: !c.enabled });
-      await configs.refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  async function submitNew(e: FormEvent) {
-    e.preventDefault();
-    try {
-      await api.upsertRegionConfig({ ...form, enabled: false });
-      toast.success("Region disabled");
-      setForm({ court_type: "", state_code: "" });
-      await configs.refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
-    }
-  }
-
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="text-base">Region Configs</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Opt-out model — no row for a state means it's enabled. Add a row here only to
-          disable one.
-        </p>
-        <form className="mb-4 flex flex-wrap items-end gap-3" onSubmit={submitNew}>
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Court type</label>
-            <Input
-              required
-              value={form.court_type}
-              onChange={(e) => setForm({ ...form, court_type: e.target.value })}
-              placeholder="district_court"
-              className="w-40"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">State code</label>
-            <Input
-              required
-              value={form.state_code}
-              onChange={(e) => setForm({ ...form, state_code: e.target.value })}
-              placeholder="e.g. 1 (Maharashtra)"
-              className="w-40"
-            />
-          </div>
-          <Button type="submit" variant="destructive">
-            Disable region
-          </Button>
-        </form>
-
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Court type</TableHead>
-              <TableHead>State code</TableHead>
-              <TableHead>Enabled</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {configs.items.map((c) => {
-              const key = `${c.court_type}:${c.state_code}`;
-              return (
-                <TableRow key={key}>
-                  <TableCell>{c.court_type}</TableCell>
-                  <TableCell>{c.state_code}</TableCell>
-                  <TableCell>
-                    <Checkbox
-                      checked={c.enabled}
-                      disabled={busyKey === key}
-                      onCheckedChange={() => toggle(c)}
-                    />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
-}
-
 function TriggerCard() {
-  const [form, setForm] = useState({
-    court_type: "high_court",
-    cause_list_date: "",
-    bench_key: "",
-    court_name_code: "",
-  });
+  const { entries: courtDirectory } = useCourtDirectory();
+  const [courtType, setCourtType] = useState<(typeof COURT_TYPES)[number]>("high_court");
+  const [causeListDate, setCauseListDate] = useState("");
+  const [benchKey, setBenchKey] = useState("");
+  const [district, setDistrict] = useState({ stateCode: "", districtCode: "", complexCode: "", courtNameCode: "" });
   const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!causeListDate) {
+      toast.error("Pick a cause-list date");
+      return;
+    }
+    if (courtType === "high_court" && !benchKey) {
+      toast.error("Pick a bench");
+      return;
+    }
+    if (courtType === "district_court" && !district.courtNameCode) {
+      toast.error("Pick a court");
+      return;
+    }
     setBusy(true);
     try {
       await api.triggerCauseListFetch({
-        court_type: form.court_type,
-        cause_list_date: form.cause_list_date,
-        bench_key: form.court_type === "high_court" ? form.bench_key : undefined,
-        court_name_code: form.court_type === "district_court" ? form.court_name_code : undefined,
+        court_type: courtType,
+        cause_list_date: causeListDate,
+        bench_key: courtType === "high_court" ? benchKey : undefined,
+        court_name_code: courtType === "district_court" ? district.courtNameCode : undefined,
       });
       toast.success("Fetch enqueued");
     } catch (err) {
@@ -240,46 +253,31 @@ function TriggerCard() {
         <form className="flex flex-wrap items-end gap-3" onSubmit={submit}>
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">Court type</label>
-            <select
-              className="h-9 w-40 rounded-md border bg-background px-3 text-sm"
-              value={form.court_type}
-              onChange={(e) => setForm({ ...form, court_type: e.target.value })}
-            >
-              <option value="high_court">high_court</option>
-              <option value="district_court">district_court</option>
-            </select>
+            <Select value={courtType} onValueChange={(v) => setCourtType(v as (typeof COURT_TYPES)[number])}>
+              <SelectTrigger size="sm" className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {COURT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          {form.court_type === "high_court" ? (
+          {courtType === "high_court" ? (
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Bench key</label>
-              <Input
-                required
-                value={form.bench_key}
-                onChange={(e) => setForm({ ...form, bench_key: e.target.value })}
-                placeholder="bombay_mumbai"
-                className="w-44"
-              />
+              <label className="mb-1 block text-xs text-muted-foreground">Bench</label>
+              <Select value={benchKey || undefined} onValueChange={setBenchKey}>
+                <SelectTrigger size="sm" className="w-56"><SelectValue placeholder="Select bench" /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(KNOWN_BENCHES).map(([key, b]) => (
+                    <SelectItem key={key} value={key}>{b.courtGroup} — {b.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : (
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Court name code</label>
-              <Input
-                required
-                value={form.court_name_code}
-                onChange={(e) => setForm({ ...form, court_name_code: e.target.value })}
-                className="w-44"
-              />
-            </div>
+            <DistrictCourtCascadeSelect entries={courtDirectory} {...district} onChange={setDistrict} />
           )}
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">Cause-list date</label>
-            <Input
-              required
-              type="date"
-              value={form.cause_list_date}
-              onChange={(e) => setForm({ ...form, cause_list_date: e.target.value })}
-              className="w-40"
-            />
+            <DatePicker value={causeListDate} onChange={setCauseListDate} />
           </div>
           <Button type="submit" disabled={busy}>
             {busy ? "Enqueuing…" : "Refresh now"}
@@ -295,7 +293,6 @@ export function SchedulingPage() {
     <div>
       <h1 className="mb-6 text-xl font-semibold">Scheduling</h1>
       <JobSchedulesCard />
-      <RegionConfigsCard />
       <TriggerCard />
     </div>
   );

@@ -56,7 +56,7 @@ const NAV = [
   { to: "/tenants", label: "Tenants", icon: Building2 },
   { to: "/cause-lists/review", label: "Cause Lists", icon: ClipboardList },
   { to: "/cause-lists/fetch-history", label: "Fetch History", icon: History },
-  { to: "/bench-configs", label: "Bench Configs", icon: Gavel },
+  { to: "/bench-configs", label: "Court Config", icon: Gavel },
   { to: "/scheduling", label: "Scheduling", icon: CalendarClock },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
