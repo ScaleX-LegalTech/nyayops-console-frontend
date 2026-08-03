@@ -24,9 +24,10 @@ export function TenantUsersPage() {
     try {
       await action();
       toast.success(successMessage);
-      await list.refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      await list.refetch();
     }
   }
 
