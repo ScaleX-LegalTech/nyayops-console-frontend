@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PaginationBar } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { api } from "@/lib/api";
+import { api, type Tenant } from "@/lib/api";
 import { usePaginatedList } from "@/lib/pagination";
 
 export function TenantUsersPage() {
@@ -19,6 +19,11 @@ export function TenantUsersPage() {
     (limit, offset) => api.listTenantUsers(tenantId!, limit, offset),
     25,
   );
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  useEffect(() => {
+    if (tenantId) api.getTenant(tenantId).then(setTenant).catch(() => setTenant(null));
+  }, [tenantId]);
+  const purged = !!tenant?.purged_at;
 
   async function act(action: () => Promise<unknown>, successMessage: string) {
     try {
@@ -35,21 +40,27 @@ export function TenantUsersPage() {
     <div>
       <h1 className="mb-6 text-xl font-semibold">Tenant Users</h1>
 
-      <form
-        className="mb-6 flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!tenantId) return;
-          act(() => api.inviteUser(tenantId, inviteEmail, inviteName), "Invited").then(() => {
-            setInviteEmail("");
-            setInviteName("");
-          });
-        }}
-      >
-        <Input placeholder="Email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="w-56" />
-        <Input placeholder="Full name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="w-56" />
-        <Button type="submit">Invite</Button>
-      </form>
+      {purged ? (
+        <p className="mb-6 text-sm text-muted-foreground">
+          This tenant has been purged - its users and data no longer exist.
+        </p>
+      ) : (
+        <form
+          className="mb-6 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!tenantId) return;
+            act(() => api.inviteUser(tenantId, inviteEmail, inviteName), "Invited").then(() => {
+              setInviteEmail("");
+              setInviteName("");
+            });
+          }}
+        >
+          <Input placeholder="Email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="w-56" />
+          <Input placeholder="Full name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="w-56" />
+          <Button type="submit">Invite</Button>
+        </form>
+      )}
 
       <div className="rounded-lg border bg-card">
         <Table>
@@ -74,49 +85,53 @@ export function TenantUsersPage() {
                   {u.is_active && !u.is_restricted && <Badge variant="success">active</Badge>}
                 </TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      tenantId &&
-                      act(
-                        () => api.updateUser(tenantId, u.id, { is_active: !u.is_active }),
-                        u.is_active ? "Deactivated" : "Activated",
-                      )
-                    }
-                  >
-                    {u.is_active ? "Deactivate" : "Activate"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      tenantId &&
-                      act(
-                        () => api.updateUser(tenantId, u.id, { is_restricted: !u.is_restricted }),
-                        u.is_restricted ? "Unfrozen" : "Frozen (read-only)",
-                      )
-                    }
-                  >
-                    {u.is_restricted ? "Unfreeze" : "Freeze"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => tenantId && act(() => api.resetUserPassword(tenantId, u.id), "Password reset")}
-                  >
-                    Reset password
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      if (tenantId && window.confirm(`Delete ${u.email}?`))
-                        act(() => api.deleteUser(tenantId, u.id), "Deleted");
-                    }}
-                  >
-                    Delete
-                  </Button>
+                  {!purged && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          tenantId &&
+                          act(
+                            () => api.updateUser(tenantId, u.id, { is_active: !u.is_active }),
+                            u.is_active ? "Deactivated" : "Activated",
+                          )
+                        }
+                      >
+                        {u.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          tenantId &&
+                          act(
+                            () => api.updateUser(tenantId, u.id, { is_restricted: !u.is_restricted }),
+                            u.is_restricted ? "Unfrozen" : "Frozen (read-only)",
+                          )
+                        }
+                      >
+                        {u.is_restricted ? "Unfreeze" : "Freeze"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => tenantId && act(() => api.resetUserPassword(tenantId, u.id), "Password reset")}
+                      >
+                        Reset password
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          if (tenantId && window.confirm(`Delete ${u.email}?`))
+                            act(() => api.deleteUser(tenantId, u.id), "Deleted");
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

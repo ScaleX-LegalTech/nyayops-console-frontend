@@ -73,38 +73,48 @@ export function TenantsPage() {
                 <TableCell className="font-medium">{t.name}</TableCell>
                 <TableCell className="text-muted-foreground">{t.slug}</TableCell>
                 <TableCell>
-                  <button
-                    className="underline decoration-dotted"
-                    onClick={() => {
-                      const plan = window.prompt("New plan", t.plan);
-                      if (plan) act(() => api.setPlan(t.id, plan), `Plan set to ${plan}`);
-                    }}
-                  >
-                    {t.plan}
-                  </button>
+                  {t.purged_at ? (
+                    t.plan
+                  ) : (
+                    <button
+                      className="underline decoration-dotted"
+                      onClick={() => {
+                        const plan = window.prompt("New plan", t.plan);
+                        if (plan) act(() => api.setPlan(t.id, plan), `Plan set to ${plan}`);
+                      }}
+                    >
+                      {t.plan}
+                    </button>
+                  )}
                 </TableCell>
                 <TableCell>
-                  <Select
-                    value={t.billing_status}
-                    onValueChange={(v) => act(() => api.setBillingStatus(t.id, v), "Billing status updated")}
-                  >
-                    <SelectTrigger size="sm" className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">active</SelectItem>
-                      <SelectItem value="overdue">overdue</SelectItem>
-                      <SelectItem value="suspended">suspended</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {t.purged_at ? (
+                    t.billing_status
+                  ) : (
+                    <Select
+                      value={t.billing_status}
+                      onValueChange={(v) => act(() => api.setBillingStatus(t.id, v), "Billing status updated")}
+                    >
+                      <SelectTrigger size="sm" className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">active</SelectItem>
+                        <SelectItem value="overdue">overdue</SelectItem>
+                        <SelectItem value="suspended">suspended</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </TableCell>
                 <TableCell>
                   <StatusBadge tenant={t} />
                 </TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap">
-                  <Button size="sm" variant="secondary" asChild>
-                    <Link to={`/tenants/${t.id}/users`}>Manage users</Link>
-                  </Button>
+                  {!t.purged_at && (
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link to={`/tenants/${t.id}/users`}>Manage users</Link>
+                    </Button>
+                  )}
                   {!t.deleted_at && (
                     <Button
                       size="sm"
